@@ -9,17 +9,30 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "^15.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.45.4",
     "@supabase/ssr": "^0.5.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "@tiptap/extension-color": "^3.23.1",
+    "@tiptap/extension-font-family": "^3.23.1",
+    "@tiptap/extension-highlight": "^3.23.1",
+    "@tiptap/extension-table": "^3.23.1",
+    "@tiptap/extension-table-cell": "^3.23.1",
+    "@tiptap/extension-table-header": "^3.23.1",
+    "@tiptap/extension-table-row": "^3.23.1",
+    "@tiptap/extension-text-align": "^3.23.1",
+    "@tiptap/extension-text-style": "^3.23.1",
+    "@tiptap/extension-underline": "^3.23.1",
+    "@tiptap/pm": "^3.23.1",
+    "@tiptap/react": "^3.23.1",
+    "@tiptap/starter-kit": "^3.23.1",
+    "axios": "^1.7.7",
     "framer-motion": "^11.11.0",
     "gsap": "^3.12.5",
-    "axios": "^1.7.7"
+    "next": "^15.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0"
+    "@tailwindcss/postcss": "^4.0.0",
+    "tailwindcss": "^4.0.0"
   }
 }

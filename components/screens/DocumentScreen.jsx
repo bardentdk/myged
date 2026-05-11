@@ -122,7 +122,10 @@ export default function DocumentScreen({ id }) {
           </button>
           {isLocked && !lockedByMe
             ? <button className="btn sm" disabled style={{ opacity: .55 }}><Icon name="lock" size={13} /> Modifier</button>
-            : <button className="btn primary sm" onClick={() => setShowEdit(true)}><Icon name="edit" size={13} /> Modifier</button>}
+            : <>
+                <button className="btn sm" onClick={() => setShowEdit(true)}><Icon name="edit" size={13} /> Propriétés</button>
+                <button className="btn primary sm" onClick={() => router.push(`/documents/${doc.id}/edit`)}><Icon name="pencil" size={13} /> Modifier le contenu</button>
+              </>}
           <div style={{ position: 'relative' }}>
             <button className="btn sm ghost" onClick={() => setShowMore(v => !v)}><Icon name="more" size={14} /></button>
             {showMore && (
