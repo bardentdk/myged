@@ -27,9 +27,12 @@ function KpiCard({ k, index }) {
   useEffect(() => {
     const el = valRef.current;
     if (!el) return;
-    gsap.fromTo({ n: 0 }, { n: k.value, duration: 1.0, delay: index * 0.1, ease: 'power2.out',
-      onUpdate: function () { if (el) el.textContent = Math.round(this.targets()[0].n); },
+    const obj = { n: 0 };
+    const tween = gsap.to(obj, {
+      n: k.value, duration: 1.0, delay: index * 0.1, ease: 'power2.out',
+      onUpdate() { if (el) el.textContent = Math.round(obj.n); },
     });
+    return () => tween.kill();
   }, [k.value, index]);
 
   return (
