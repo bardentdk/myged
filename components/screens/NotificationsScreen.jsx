@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import { Avatar, EmptyState } from '@/components/ui/Atoms';
 import { USERS } from '@/lib/data';
+import { useNotifications } from '@/lib/context/NotificationsContext';
 
 const NOTIFS = [
   { id: 'n1',  type: 'unlock',   icon: 'unlock',      title: 'Document libéré',                      body: 'Sylvie Hoarau a libéré « Convention TP SA 2026 ». Vous pouvez maintenant le modifier.',                                                          who: 'sylvie',  when: 'il y a 2 min',        read: false, docId: 'd1' },
@@ -54,16 +55,12 @@ const PrefItem = ({ label, icon, defaultOn }) => {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const [items, setItems] = useState(NOTIFS);
+  const { notifications, unreadCount, markRead, markAllRead, dismiss } = useNotifications();
   const [filterTab, setFilterTab] = useState('all');
   const [preferences, setPreferences] = useState(false);
 
-  const unread = items.filter(n => !n.read);
-  const shown = filterTab === 'unread' ? unread : items;
-
-  const markAllRead = () => setItems(ns => ns.map(n => ({ ...n, read: true })));
-  const markRead = (id) => setItems(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
-  const dismiss = (id) => setItems(ns => ns.filter(n => n.id !== id));
+  const unread = notifications.filter(n => !n.read);
+  const shown = filterTab === 'unread' ? unread : notifications;
 
   return (
     <div className="page" style={{ paddingTop: 22, maxWidth: 900 }}>
@@ -71,7 +68,7 @@ export default function NotificationsScreen() {
         <div>
           <h1 style={{ marginBottom: 4 }}>Notifications</h1>
           <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-            {unread.length} non lues · {items.length} au total
+            {unread.length} non lues · {notifications.length} au total
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -88,7 +85,7 @@ export default function NotificationsScreen() {
         <div>
           <div className="tabs" style={{ marginBottom: 14 }}>
             <span className={`tab ${filterTab === 'all' ? 'active' : ''}`} onClick={() => setFilterTab('all')}>
-              Toutes <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 4 }}>{items.length}</span>
+              Toutes <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 4 }}>{notifications.length}</span>
             </span>
             <span className={`tab ${filterTab === 'unread' ? 'active' : ''}`} onClick={() => setFilterTab('unread')}>
               Non lues <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 4 }}>{unread.length}</span>

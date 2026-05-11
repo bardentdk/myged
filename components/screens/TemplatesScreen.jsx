@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import { Badge, FileIcon } from '@/components/ui/Atoms';
 import { useToast } from '@/lib/context/ToastContext';
+import { useDocs } from '@/lib/context/DocsContext';
+import { FOLDERS, ME } from '@/lib/data';
 
 const TEMPLATES = [
   { id: 't1',  name: 'Convention de formation professionnelle',  category: 'Administratif',  type: 'doc', uses: 34, updated: '01 mars 2026',  version: '3.2', desc: 'Convention type conforme Code du travail art. L.6353-1, pré-remplie avec les champs du centre.' },
@@ -22,6 +25,82 @@ const TEMPLATES = [
 
 const CATEGORIES = ['Tous', 'Administratif', 'Pédagogie', 'RH & Contrats', 'Qualiopi'];
 
+function CreateFromTemplateModal({ tpl, onClose }) {
+  const { addDoc } = useDocs();
+  const router = useRouter();
+  const currentYear = new Date().getFullYear();
+  const [form, setForm] = useState({
+    name: `${tpl.name} — ${currentYear}`,
+    folder: FOLDERS[0].name,
+  });
+
+  const handleSubmit = () => {
+    const ext = { doc: '.docx', pdf: '.pdf', xls: '.xlsx' }[tpl.type] || '';
+    const id = 'd' + Date.now();
+    addDoc({
+      id,
+      name: form.name + ext,
+      type: tpl.type,
+      folder: form.folder,
+      size: '—',
+      version: '1.0',
+      status: 'draft',
+      owner: ME.id,
+      updatedBy: ME.id,
+      updatedAt: "à l'instant",
+      tags: [],
+      confidential: 'Interne',
+      expires: null,
+    });
+    router.push(`/documents/${id}`);
+    onClose();
+  };
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <FileIcon type={tpl.type} size={28} />
+          <div style={{ flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 15 }}>Créer depuis ce modèle</h2>
+            <div className="micro" style={{ marginTop: 2, color: 'var(--ink-3)' }}>{tpl.name}</div>
+          </div>
+          <button className="btn ghost sm" style={{ padding: 4 }} onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label className="label">Nom du document *</label>
+            <input
+              className="input"
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Dossier de destination</label>
+            <select
+              className="input"
+              value={form.folder}
+              onChange={e => setForm(f => ({ ...f, folder: e.target.value }))}
+            >
+              {FOLDERS.map(f => (
+                <option key={f.id} value={f.name}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Annuler</button>
+          <button className="btn primary" onClick={handleSubmit} disabled={!form.name.trim()}>
+            <Icon name="file" size={13} /> Créer le document
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplatesScreen() {
   const { showToast } = useToast();
   const [cat, setCat] = useState('Tous');
@@ -29,17 +108,13 @@ export default function TemplatesScreen() {
   const [view, setView] = useState('grid');
   const [previewTpl, setPreviewTpl] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [createTpl, setCreateTpl] = useState(null);
 
   const shown = TEMPLATES.filter(t => {
     if (cat !== 'Tous' && t.category !== cat) return false;
     if (searchQ && !t.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     return true;
   });
-
-  const useTemplate = (tpl) => {
-    showToast({ message: `Nouveau document créé depuis "${tpl.name}"`, icon: 'file' });
-    setPreviewTpl(null);
-  };
 
   return (
     <div className="page" style={{ paddingTop: 22 }}>
@@ -92,6 +167,10 @@ export default function TemplatesScreen() {
                 <span className="muted"><Icon name="file" size={11} /> utilisé {tpl.uses}×</span>
                 <span className="muted">mis à jour {tpl.updated}</span>
               </div>
+              <button className="btn sm primary" style={{ marginTop: 2 }}
+                onClick={e => { e.stopPropagation(); setCreateTpl(tpl); }}>
+                <Icon name="file" size={12} /> Utiliser
+              </button>
             </div>
           ))}
         </div>
@@ -128,7 +207,7 @@ export default function TemplatesScreen() {
                   <td className="micro">{tpl.updated}</td>
                   <td onClick={e => e.stopPropagation()}>
                     <div className="row" style={{ gap: 4 }}>
-                      <button className="btn sm primary" onClick={() => useTemplate(tpl)}>Utiliser</button>
+                      <button className="btn sm primary" onClick={() => setCreateTpl(tpl)}>Utiliser</button>
                       <button className="btn ghost sm" style={{ padding: 4 }}><Icon name="more" size={14} /></button>
                     </div>
                   </td>
@@ -175,7 +254,7 @@ export default function TemplatesScreen() {
             <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setPreviewTpl(null)}>Fermer</button>
               <button className="btn"><Icon name="download" size={13} /> Télécharger</button>
-              <button className="btn primary" onClick={() => useTemplate(previewTpl)}>
+              <button className="btn primary" onClick={() => { setCreateTpl(previewTpl); setPreviewTpl(null); }}>
                 <Icon name="file" size={13} /> Créer depuis ce modèle
               </button>
             </div>
@@ -215,6 +294,10 @@ export default function TemplatesScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {createTpl && (
+        <CreateFromTemplateModal tpl={createTpl} onClose={() => setCreateTpl(null)} />
       )}
     </div>
   );

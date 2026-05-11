@@ -1,161 +1,158 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { gsap } from 'gsap';
 import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
-import { USERS, DOCS, ACTIVITY } from '@/lib/data';
+import { useDocs } from '@/lib/context/DocsContext';
+import { useNotifications } from '@/lib/context/NotificationsContext';
+import { USERS, ACTIVITY, ME } from '@/lib/data';
 
-const kpis = [
-  { label: 'Documents récents',        value: 47, delta: '+12 cette semaine', deltaCls: 'up',   icon: 'file' },
-  { label: 'En attente de validation', value: 8,  delta: '3 urgents',          deltaCls: 'down', icon: 'clock' },
-  { label: 'Verrouillés actuellement', value: 3,  delta: 'par 2 collaborateurs',deltaCls: '',    icon: 'lock' },
-  { label: 'Expirent sous 30 jours',   value: 6,  delta: '2 documents Qualiopi',deltaCls: 'down',icon: 'warn' },
-];
-
-const expiringSoon = [
-  { name: 'Assurance RC professionnelle 2025-2026', expires: '01/06/2026', days: 21, type: 'pdf' },
-  { name: 'Pièce identité — Mélanie Grondin',        expires: '14/06/2026', days: 34, type: 'pdf' },
-  { name: 'Convention OPCO Akto — TP SA 2026',       expires: '15/06/2026', days: 35, type: 'pdf' },
-];
-
-function KpiCard({ k, index }) {
+function KpiCard({ label, value, delta, deltaCls, icon, index }) {
   const valRef = useRef(null);
-
   useEffect(() => {
     const el = valRef.current;
     if (!el) return;
     const obj = { n: 0 };
     const tween = gsap.to(obj, {
-      n: k.value, duration: 1.0, delay: index * 0.1, ease: 'power2.out',
+      n: value, duration: 1.0, delay: index * 0.1, ease: 'power2.out',
       onUpdate() { if (el) el.textContent = Math.round(obj.n); },
     });
     return () => tween.kill();
-  }, [k.value, index]);
+  }, [value, index]);
 
   return (
-    <motion.div className="kpi"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.07 }}>
-      <div className="label">
-        <span>{k.label}</span>
-        <Icon name={k.icon} size={14} style={{ color: 'var(--ink-4)' }} />
-      </div>
-      <div className="value" ref={valRef}>{k.value}</div>
-      <div className={`delta ${k.deltaCls}`}>{k.delta}</div>
+    <motion.div className="kpi" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.07 }}>
+      <div className="label"><span>{label}</span><Icon name={icon} size={14} style={{ color: 'var(--ink-4)' }} /></div>
+      <div className="value" ref={valRef}>{value}</div>
+      <div className={`delta ${deltaCls}`}>{delta}</div>
     </motion.div>
   );
 }
 
+const TASK_ICONS = { check: 'check', shield: 'shield', refresh: 'refresh', bell: 'bell', upload: 'upload' };
+
 export default function DashboardScreen() {
   const router = useRouter();
-  const lockedDocs = DOCS.filter((d) => d.lockedBy);
+  const { docs } = useDocs();
+  const { unreadCount } = useNotifications();
 
-  const openDoc = (id) => router.push(`/documents/${id}`);
+  const lockedDocs     = docs.filter((d) => d.lockedBy);
+  const pendingDocs    = docs.filter((d) => d.status === 'review' || d.status === 'pending');
+  const expiringDocs   = docs.filter((d) => d.expires && d.expires !== null).slice(0, 3);
+  const recentDocs     = docs.slice(0, 7);
+
+  const [actFilter, setActFilter] = useState('all');
+  const [tasks, setTasks] = useState([
+    { id: 1, label: 'Valider la convention TP SA 2026',  sub: 'Demandé par Sylvie · il y a 8 min', accent: true,  icon: 'check',   done: false, docId: 'd1' },
+    { id: 2, label: 'Compléter indicateur 19 Qualiopi',  sub: 'Audit dans 14 jours · 2 pièces manquantes',      icon: 'shield',  done: false, docId: null },
+    { id: 3, label: 'Renouveler assurance RC pro',       sub: 'Expire dans 21 jours',               icon: 'refresh', done: false, docId: 'd9'  },
+  ]);
+  const pendingTasks = tasks.filter((t) => !t.done).length;
+
+  const kpis = [
+    { label: 'Documents',           value: docs.length,                    delta: `${pendingDocs.length} en validation`,  deltaCls: pendingDocs.length > 0 ? 'down' : '', icon: 'file'  },
+    { label: 'En attente validation',value: pendingDocs.length,            delta: pendingDocs.length > 0 ? 'À traiter' : 'Tout est validé', deltaCls: pendingDocs.length > 0 ? 'down' : '', icon: 'clock' },
+    { label: 'Verrouillés',          value: lockedDocs.length,             delta: 'par ' + new Set(lockedDocs.map(d => d.lockedBy)).size + ' collaborateurs', deltaCls: '', icon: 'lock' },
+    { label: 'Notifications',        value: unreadCount,                   delta: 'non lues',                            deltaCls: unreadCount > 0 ? 'down' : '', icon: 'bell' },
+  ];
+
+  const shownActivity = ACTIVITY.filter((a) => {
+    if (actFilter === 'mine') return a.who === ME.id;
+    if (actFilter === 'team') return ['sylvie', 'melanie', 'jb', 'thierry'].includes(a.who);
+    return true;
+  });
+
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="page">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 22, alignItems: 'flex-end' }}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>Bonjour Anne</h1>
+          <h1 style={{ marginBottom: 4 }}>Bonjour {ME.name.split(' ')[0]}</h1>
           <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-            Vendredi 15 mars 2026 · Vous avez <strong style={{ color: 'var(--ink)' }}>3 tâches</strong> en attente aujourd'hui.
+            {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} · Vous avez{' '}
+            <strong style={{ color: pendingTasks > 0 ? 'var(--ink)' : 'var(--ok)' }}>{pendingTasks} tâche{pendingTasks !== 1 ? 's' : ''}</strong> en attente.
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn"><Icon name="upload" size={13} /> Téléverser</button>
-          <button className="btn primary"><Icon name="plus" size={13} /> Nouveau document</button>
+          <button className="btn" onClick={() => router.push('/documents')}><Icon name="folder" size={13} /> Documents</button>
+          <button className="btn primary" onClick={() => router.push('/documents')}><Icon name="plus" size={13} /> Nouveau document</button>
         </div>
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 22 }}>
-        {kpis.map((k, i) => <KpiCard key={i} k={k} index={i} />)}
+        {kpis.map((k, i) => <KpiCard key={i} index={i} {...k} />)}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
         <div className="col" style={{ gap: 18 }}>
+          {/* Locked docs */}
           <div className="card">
             <div className="card-hd">
               <div className="row" style={{ gap: 10 }}>
                 <Icon name="lock" size={15} style={{ color: 'var(--warn)' }} />
-                <h2>Documents verrouillés en ce moment</h2>
-                <Badge kind="warn" dot>{lockedDocs.length} actifs</Badge>
+                <h2>Documents verrouillés</h2>
+                {lockedDocs.length > 0 && <Badge kind="warn" dot>{lockedDocs.length} actifs</Badge>}
               </div>
-              <a href="#" className="micro" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Voir tout →</a>
+              <button className="micro" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => router.push('/documents')}>Voir tout →</button>
             </div>
-            <div>
-              {lockedDocs.map((doc, i) => (
-                <div key={doc.id} onClick={() => openDoc(doc.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
-                    borderBottom: i < lockedDocs.length - 1 ? '1px solid var(--line)' : '0',
-                    cursor: 'pointer', transition: 'background .12s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <FileIcon type={doc.type} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: 13.5, marginBottom: 3 }} className="truncate">{doc.name}</div>
-                    <div className="row" style={{ gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
-                      <Avatar user={USERS[doc.lockedBy]} size="xs" />
-                      <span><strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{USERS[doc.lockedBy].name.split(' ')[0]}</strong> modifie · depuis <span className="mono">{doc.lockedSince}</span></span>
-                      <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--warn)' }} className="pulse-warn" />
-                    </div>
+            {lockedDocs.length === 0 ? (
+              <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+                <Icon name="unlock" size={24} style={{ marginBottom: 8, opacity: .4 }} /><br />Aucun document verrouillé
+              </div>
+            ) : lockedDocs.map((doc, i) => (
+              <div key={doc.id} onClick={() => router.push(`/documents/${doc.id}`)}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderTop: i > 0 ? '1px solid var(--line)' : 0, cursor: 'pointer' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                <FileIcon type={doc.type} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 500, fontSize: 13.5, marginBottom: 3 }} className="truncate">{doc.name}</div>
+                  <div className="row" style={{ gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
+                    <Avatar user={USERS[doc.lockedBy]} size="xs" />
+                    <span><strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{USERS[doc.lockedBy]?.name.split(' ')[0]}</strong> modifie · depuis <span className="mono">{doc.lockedSince}</span></span>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--warn)', flexShrink: 0 }} />
                   </div>
-                  <button className="btn sm" onClick={(e) => e.stopPropagation()}><Icon name="download" size={12} /> Copie</button>
-                  <button className="btn sm primary" onClick={(e) => { e.stopPropagation(); openDoc(doc.id); }}>Ouvrir</button>
                 </div>
-              ))}
-              {[
-                { name: 'Bilan pédagogique Q1 — Saint-Pierre.xlsx', who: 'melanie', since: '11:48', type: 'xls' },
-                { name: 'Plan de formation 2026 — Direction.docx',  who: 'jb',      since: '09:15', type: 'doc' },
-              ].map((doc, i) => (
-                <div key={'extra' + i}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <FileIcon type={doc.type} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: 13.5, marginBottom: 3 }} className="truncate">{doc.name}</div>
-                    <div className="row" style={{ gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
-                      <Avatar user={USERS[doc.who]} size="xs" />
-                      <span><strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{USERS[doc.who].name.split(' ')[0]}</strong> modifie · depuis <span className="mono">{doc.since}</span></span>
-                    </div>
-                  </div>
-                  <button className="btn sm"><Icon name="download" size={12} /> Copie</button>
-                  <button className="btn sm"><Icon name="bell" size={12} /> Notifier</button>
-                </div>
-              ))}
-            </div>
+                <button className="btn sm" onClick={(e) => e.stopPropagation()}><Icon name="download" size={12} /> Copie</button>
+                <button className="btn sm primary" onClick={(e) => { e.stopPropagation(); router.push(`/documents/${doc.id}`); }}>Ouvrir</button>
+              </div>
+            ))}
           </div>
 
+          {/* Activity */}
           <div className="card">
             <div className="card-hd">
               <h2>Activité récente</h2>
               <div className="tabs" style={{ border: 0, marginRight: -8 }}>
-                <span className="tab active">Tout</span>
-                <span className="tab">Mon équipe</span>
-                <span className="tab">Mes documents</span>
+                {[['all', 'Tout'], ['team', 'Mon équipe'], ['mine', 'Mes documents']].map(([id, label]) => (
+                  <span key={id} className={`tab ${actFilter === id ? 'active' : ''}`} onClick={() => setActFilter(id)} style={{ cursor: 'pointer' }}>{label}</span>
+                ))}
               </div>
             </div>
             <div className="card-bd" style={{ paddingTop: 4, paddingBottom: 4 }}>
-              {ACTIVITY.map((a) => {
+              {shownActivity.length === 0 ? (
+                <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Aucune activité</div>
+              ) : shownActivity.map((a) => {
                 const u = USERS[a.who];
                 const iconMap = { lock: 'lock', upload: 'upload', comment: 'msg', validate: 'check', share: 'share', restore: 'history', sign: 'sig' };
                 const colorMap = { lock: 'var(--warn)', upload: 'var(--ink-3)', comment: 'var(--accent)', validate: 'var(--ok)', share: 'var(--accent)', restore: 'var(--ink-3)', sign: 'var(--violet)' };
                 return (
-                  <div key={a.id} className="act-item">
+                  <div key={a.id} className="act-item" style={{ cursor: a.docId ? 'pointer' : 'default' }} onClick={() => a.docId && router.push(`/documents/${a.docId}`)}>
                     <Avatar user={u} size="md" />
                     <div className="act-body">
                       <div>
                         <strong style={{ fontWeight: 500 }}>{u.name}</strong>{' '}
                         <span className="muted">{a.verb}</span>{' '}
-                        {a.target && <span><strong style={{ fontWeight: 500 }}>{a.target}</strong>{' '}<span className="muted">le document</span>{' '}</span>}
-                        <a href="#" style={{ color: 'var(--ink)', textDecoration: 'none', fontWeight: 500 }}>{a.what}</a>
+                        {a.target && <><strong style={{ fontWeight: 500 }}>{a.target}</strong>{' '}<span className="muted">le</span>{' '}</>}
+                        <span style={{ fontWeight: 500 }}>{a.what}</span>
                       </div>
                       <div className="act-time row" style={{ gap: 6, marginTop: 2 }}>
-                        <Icon name={iconMap[a.type]} size={11} style={{ color: colorMap[a.type] }} />
+                        <Icon name={iconMap[a.type] || 'clock'} size={11} style={{ color: colorMap[a.type] || 'var(--ink-3)' }} />
                         <span>{a.when}</span>
                       </div>
                     </div>
@@ -163,48 +160,53 @@ export default function DashboardScreen() {
                 );
               })}
             </div>
+            <div className="card-ft">
+              <span />
+              <button className="btn sm ghost" onClick={() => router.push('/activity')}>Journal complet →</button>
+            </div>
           </div>
         </div>
 
         <div className="col" style={{ gap: 18 }}>
+          {/* Tasks */}
           <div className="card">
             <div className="card-hd">
               <h2>À faire aujourd'hui</h2>
-              <Badge kind="accent">3 tâches</Badge>
+              <Badge kind={pendingTasks > 0 ? 'accent' : 'ok'}>{pendingTasks > 0 ? `${pendingTasks} tâches` : 'Tout fait ✓'}</Badge>
             </div>
             <div>
-              {[
-                { label: 'Valider la convention TP SA 2026',   sub: 'Demandé par Sylvie · il y a 8 min', accent: true, icon: 'check' },
-                { label: 'Compléter indicateur 19 Qualiopi',   sub: 'Audit dans 14 jours · 2 pièces manquantes', icon: 'shield' },
-                { label: 'Renouveler assurance RC pro',        sub: 'Expire dans 21 jours', icon: 'refresh' },
-              ].map((task, i) => (
-                <div key={i} style={{ padding: '12px 18px', borderTop: i > 0 ? '1px solid var(--line)' : 0, display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: task.accent ? 'var(--accent-soft)' : 'var(--surface-2)', color: task.accent ? 'var(--accent)' : 'var(--ink-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line)' }}>
-                    <Icon name={task.icon} size={14} />
-                  </div>
+              {tasks.map((task, i) => (
+                <div key={task.id} style={{ padding: '12px 18px', borderTop: i > 0 ? '1px solid var(--line)' : 0, display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer', opacity: task.done ? 0.45 : 1, transition: 'opacity .2s' }}
+                  onClick={() => task.docId && router.push(`/documents/${task.docId}`)}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setTasks((ts) => ts.map((t) => t.id === task.id ? { ...t, done: !t.done } : t)); }}
+                    style={{ width: 20, height: 20, borderRadius: 5, flexShrink: 0, marginTop: 2, background: task.done ? 'var(--ok)' : 'transparent', color: task.done ? '#fff' : 'var(--ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${task.done ? 'var(--ok)' : 'var(--line-strong)'}`, cursor: 'pointer' }}>
+                    {task.done && <Icon name="check" size={12} />}
+                  </button>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: 13.5 }}>{task.label}</div>
+                    <div style={{ fontWeight: 500, fontSize: 13.5, textDecoration: task.done ? 'line-through' : 'none' }}>{task.label}</div>
                     <div className="micro" style={{ marginTop: 2 }}>{task.sub}</div>
                   </div>
-                  <Icon name="chevR" size={14} style={{ color: 'var(--ink-4)', marginTop: 6 }} />
+                  {!task.done && <Icon name="chevR" size={14} style={{ color: 'var(--ink-4)', marginTop: 4 }} />}
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Qualiopi */}
           <div className="card">
             <div className="card-hd">
               <div className="row" style={{ gap: 8 }}>
                 <Icon name="shield" size={14} style={{ color: 'var(--accent)' }} />
                 <h2>Qualiopi 2026</h2>
               </div>
-              <a className="micro" style={{ color: 'var(--accent)', textDecoration: 'none', cursor: 'pointer' }} onClick={() => router.push('/qualiopi')}>Voir l'audit →</a>
+              <button className="micro" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => router.push('/qualiopi')}>Voir l'audit →</button>
             </div>
             <div className="card-bd">
               <div className="row" style={{ alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em' }}>74%</span>
                 <span className="muted" style={{ fontSize: 13 }}>de pièces collectées</span>
-                <span className="badge b-warn" style={{ marginLeft: 'auto' }}><span className="dot" /> Audit dans 14 j</span>
+                <span className="badge b-warn" style={{ marginLeft: 'auto' }}>Audit dans 14 j</span>
               </div>
               <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
                 {Array.from({ length: 32 }).map((_, i) => {
@@ -215,34 +217,41 @@ export default function DashboardScreen() {
                 })}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                <div><div className="micro">Validés</div><div style={{ fontSize: 16, fontWeight: 600 }}>5 <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>/ 8 indic.</span></div></div>
+                <div><div className="micro">Validés</div><div style={{ fontSize: 16, fontWeight: 600 }}>5 <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>/ 8</span></div></div>
                 <div><div className="micro">En cours</div><div style={{ fontSize: 16, fontWeight: 600 }}>2</div></div>
                 <div><div className="micro">À traiter</div><div style={{ fontSize: 16, fontWeight: 600, color: 'var(--err)' }}>1</div></div>
               </div>
             </div>
             <div className="card-ft">
               <span className="micro">Responsable: Thierry Bègue</span>
-              <button className="btn sm">Préparer l'export</button>
+              <button className="btn sm" onClick={() => router.push('/qualiopi')}>Préparer l'export</button>
             </div>
           </div>
 
+          {/* Expiring */}
           <div className="card">
             <div className="card-hd">
               <h2>Expirent bientôt</h2>
-              <Badge kind="warn">{expiringSoon.length}</Badge>
+              {expiringDocs.length > 0 && <Badge kind="warn">{expiringDocs.length}</Badge>}
             </div>
-            <div>
-              {expiringSoon.map((d, i) => (
-                <div key={i} style={{ padding: '10px 18px', borderTop: i > 0 ? '1px solid var(--line)' : 0, display: 'flex', gap: 10, alignItems: 'center' }}>
+            {expiringDocs.length === 0 ? (
+              <div style={{ padding: '20px 18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Aucun document en expiration</div>
+            ) : expiringDocs.map((d, i) => {
+              const expires = d.expires;
+              return (
+                <div key={d.id} onClick={() => router.push(`/documents/${d.id}`)}
+                  style={{ padding: '10px 18px', borderTop: i > 0 ? '1px solid var(--line)' : 0, display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                   <FileIcon type={d.type} size={22} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 500, fontSize: 13 }} className="truncate">{d.name}</div>
-                    <div className="micro mono">expire le {d.expires}</div>
+                    <div className="micro mono">expire le {expires}</div>
                   </div>
-                  <Badge kind={d.days < 30 ? 'err' : 'warn'}>{d.days}j</Badge>
+                  <Badge kind="warn">!</Badge>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>

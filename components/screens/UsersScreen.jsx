@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/Icon';
 import { Avatar, Badge } from '@/components/ui/Atoms';
-import { USERS } from '@/lib/data';
 import { useToast } from '@/lib/context/ToastContext';
 
 const ROLE_PERMS = {
@@ -19,7 +18,7 @@ const ROLE_PERMS = {
   'Entreprise partenaire':{ read: 0, download: 0, edit: 0, validate: 0, sign: 0, delete: 0, share: 0, confidential: 0 },
 };
 
-const ALL_USERS = [
+const INITIAL_USERS = [
   { id: 'sylvie',  name: 'Sylvie Hoarau',          role: 'Responsable admin', email: 'sylvie.hoarau@cfa-horizon.re',    active: true,  lastLogin: "aujourd'hui · 14:30", color: '#0ea5e9', twofa: true },
   { id: 'anne',    name: 'Anne Payet',              role: 'Assistant admin',   email: 'anne.payet@cfa-horizon.re',       active: true,  lastLogin: "aujourd'hui · 11:50", color: '#f59e0b', twofa: true },
   { id: 'jb',      name: 'Jean-Baptiste Fontaine',  role: 'Direction',         email: 'jb.fontaine@cfa-horizon.re',      active: true,  lastLogin: 'hier · 17:08',        color: '#10b981', twofa: true },
@@ -29,24 +28,142 @@ const ALL_USERS = [
   { id: 'audit',   name: 'Auditeur AFNOR',          role: 'Auditeur Qualiopi', email: 'auditeur@afnor.org',             active: false, lastLogin: '10 mars · 09:12',     color: '#64748b', twofa: false },
 ];
 
+const COLORS = ['#0ea5e9','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#64748b','#f97316'];
 const PERM_COLS = ['read', 'download', 'edit', 'validate', 'sign', 'delete', 'share', 'confidential'];
 const PERM_LABELS = { read: 'Lecture', download: 'Téléch.', edit: 'Modifier', validate: 'Valider', sign: 'Signer', delete: 'Supprimer', share: 'Partager', confidential: 'Conf.' };
 
+function EditUserModal({ user, onClose, onSave }) {
+  const [form, setForm] = useState({ name: user.name, email: user.email, role: user.role });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Modifier l'utilisateur</h2>
+          <button className="btn ghost sm" onClick={onClose}><Icon name="x" size={16} /></button>
+        </div>
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 22 }}>
+              {user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+          </div>
+          <div>
+            <label className="label">Prénom et nom *</label>
+            <input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Prénom Nom" />
+          </div>
+          <div>
+            <label className="label">Adresse e-mail *</label>
+            <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Rôle *</label>
+            <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
+              {Object.keys(ROLE_PERMS).map(r => <option key={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Annuler</button>
+          <button className="btn primary" onClick={() => onSave(form)} disabled={!form.name.trim() || !form.email.trim()}>
+            <Icon name="check" size={13} /> Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InviteModal({ onClose, onInvite }) {
+  const [form, setForm] = useState({ email: '', name: '', role: 'Assistant admin' });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Inviter un utilisateur</h2>
+          <button className="btn ghost sm" onClick={onClose}><Icon name="x" size={16} /></button>
+        </div>
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div><label className="label">Adresse e-mail *</label><input className="input" type="email" placeholder="prenom.nom@cfa-horizon.re" value={form.email} onChange={e => set('email', e.target.value)} autoFocus /></div>
+          <div><label className="label">Prénom et nom</label><input className="input" placeholder="Prénom Nom" value={form.name} onChange={e => set('name', e.target.value)} /></div>
+          <div>
+            <label className="label">Rôle *</label>
+            <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
+              {Object.keys(ROLE_PERMS).map(r => <option key={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={{ padding: 12, background: 'var(--accent-soft)', borderRadius: 8, fontSize: 13, color: 'var(--accent-ink)' }}>
+            <Icon name="info" size={13} /> Un e-mail d'invitation sera envoyé avec un lien de connexion sécurisé (expire sous 48 h).
+          </div>
+        </div>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Annuler</button>
+          <button className="btn primary" onClick={() => onInvite(form)} disabled={!form.email.trim()}>
+            <Icon name="send" size={13} /> Envoyer l'invitation
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UsersScreen() {
   const { showToast } = useToast();
+  const [users, setUsers] = useState(INITIAL_USERS);
   const [tab, setTab] = useState('users');
   const [selectedRole, setSelectedRole] = useState('Responsable admin');
   const [showInvite, setShowInvite] = useState(false);
+  const [editUser, setEditUser] = useState(null);
   const [search, setSearch] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
-  const shown = ALL_USERS.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()));
+  const shown = users.filter(u => {
+    const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
+    const matchRole = !filterRole || u.role === filterRole;
+    const matchStatus = !filterStatus || (filterStatus === 'active' ? u.active : !u.active);
+    return matchSearch && matchRole && matchStatus;
+  });
+
+  const toggleActive = (id) => {
+    setUsers(us => us.map(u => u.id === id ? { ...u, active: !u.active } : u));
+    const u = users.find(u => u.id === id);
+    showToast({ type: 'success', message: `${u.name} ${u.active ? 'désactivé' : 'activé'}` });
+  };
+
+  const handleSaveEdit = (form) => {
+    setUsers(us => us.map(u => u.id === editUser.id ? { ...u, ...form } : u));
+    showToast({ type: 'success', message: `Profil de ${form.name} mis à jour` });
+    setEditUser(null);
+  };
+
+  const handleInvite = (form) => {
+    const initials = form.name ? form.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : form.email[0].toUpperCase();
+    const newUser = {
+      id: `u${Date.now()}`,
+      name: form.name || form.email.split('@')[0],
+      role: form.role,
+      email: form.email,
+      active: true,
+      lastLogin: 'Jamais connecté',
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      twofa: false,
+    };
+    setUsers(us => [...us, newUser]);
+    setShowInvite(false);
+    showToast({ type: 'success', message: `Invitation envoyée à ${form.email}` });
+  };
 
   return (
     <div className="page" style={{ paddingTop: 22 }}>
+      {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSave={handleSaveEdit} />}
+      {showInvite && <InviteModal onClose={() => setShowInvite(false)} onInvite={handleInvite} />}
+
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 18, alignItems: 'flex-end' }}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Utilisateurs & permissions</h1>
-          <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>{ALL_USERS.filter(u => u.active).length} utilisateurs actifs · {ALL_USERS.length} au total</p>
+          <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>{users.filter(u => u.active).length} utilisateurs actifs · {users.length} au total</p>
         </div>
         <button className="btn primary" onClick={() => setShowInvite(true)}>
           <Icon name="plus" size={13} /> Inviter un utilisateur
@@ -63,17 +180,19 @@ export default function UsersScreen() {
           <div className="card" style={{ padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 10 }}>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, height: 34 }}>
               <Icon name="search" size={14} style={{ color: 'var(--ink-3)' }} />
-              <input placeholder="Nom, e-mail, rôle…" value={search} onChange={e => setSearch(e.target.value)}
+              <input placeholder="Nom, e-mail…" value={search} onChange={e => setSearch(e.target.value)}
                 style={{ flex: 1, border: 0, outline: 0, background: 'transparent', fontSize: 13, fontFamily: 'inherit' }} />
             </div>
-            <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}>
+            <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}
+              value={filterRole} onChange={e => setFilterRole(e.target.value)}>
               <option value="">Tous les rôles</option>
               {Object.keys(ROLE_PERMS).map(r => <option key={r}>{r}</option>)}
             </select>
-            <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}>
-              <option>Tous les statuts</option>
-              <option>Actifs</option>
-              <option>Inactifs</option>
+            <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}
+              value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">Tous les statuts</option>
+              <option value="active">Actifs</option>
+              <option value="inactive">Inactifs</option>
             </select>
           </div>
 
@@ -88,12 +207,12 @@ export default function UsersScreen() {
                   <th style={{ width: 80, textAlign: 'center' }}>2FA</th>
                   <th style={{ width: 90, textAlign: 'center' }}>Statut</th>
                   <th style={{ width: 160 }}>Dernière connexion</th>
-                  <th style={{ width: 80 }}></th>
+                  <th style={{ width: 100 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map(u => (
-                  <tr key={u.id}>
+                  <tr key={u.id} style={{ opacity: u.active ? 1 : 0.55 }}>
                     <td><Avatar user={u} size="md" /></td>
                     <td className="col-name">{u.name}</td>
                     <td><Badge kind="neutral">{u.role}</Badge></td>
@@ -104,21 +223,37 @@ export default function UsersScreen() {
                         : <Icon name="warn" size={14} style={{ color: 'var(--warn)' }} />}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {u.active
-                        ? <Badge kind="ok" dot>Actif</Badge>
-                        : <Badge kind="neutral" dot>Inactif</Badge>}
+                      <button
+                        onClick={() => toggleActive(u.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        title={u.active ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}>
+                        {u.active
+                          ? <Badge kind="ok" dot>Actif</Badge>
+                          : <Badge kind="neutral" dot>Inactif</Badge>}
+                      </button>
                     </td>
                     <td className="micro mono">{u.lastLogin}</td>
                     <td>
                       <div className="row" style={{ gap: 4 }}>
-                        <button className="btn ghost sm" style={{ padding: 4 }}><Icon name="edit" size={13} /></button>
-                        <button className="btn ghost sm" style={{ padding: 4 }}><Icon name="more" size={14} /></button>
+                        <button className="btn ghost sm" style={{ padding: 4 }} title="Modifier" onClick={() => setEditUser(u)}>
+                          <Icon name="edit" size={13} />
+                        </button>
+                        <button className="btn ghost sm" style={{ padding: '4px 8px', fontSize: 12 }}
+                          onClick={() => toggleActive(u.id)}
+                          title={u.active ? 'Désactiver' : 'Réactiver'}>
+                          {u.active ? 'Désact.' : 'Activer'}
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {shown.length === 0 && (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13.5 }}>
+                Aucun utilisateur ne correspond aux filtres
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -144,11 +279,13 @@ export default function UsersScreen() {
           <div className="card">
             <div className="card-hd">
               <h2>{selectedRole}</h2>
-              <button className="btn sm primary"><Icon name="edit" size={12} /> Modifier le rôle</button>
+              <button className="btn sm primary" onClick={() => showToast({ type: 'info', message: 'Éditeur de rôle — fonctionnalité entreprise' })}>
+                <Icon name="edit" size={12} /> Modifier le rôle
+              </button>
             </div>
             <div style={{ padding: 22 }}>
               <p style={{ fontSize: 13.5, color: 'var(--ink-2)', margin: '0 0 18px' }}>
-                Membres avec ce rôle : <strong>{ALL_USERS.filter(u => u.role.includes(selectedRole.split(' ')[0])).length}</strong>
+                Membres avec ce rôle : <strong>{users.filter(u => u.role === selectedRole).length}</strong>
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 {PERM_COLS.map(p => {
@@ -181,44 +318,17 @@ export default function UsersScreen() {
                   <span style={{ fontWeight: 500, fontSize: 13 }}>Utilisateurs avec ce rôle</span>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                  {ALL_USERS.filter(u => u.role.toLowerCase().includes(selectedRole.split(' ')[0].toLowerCase())).map(u => (
+                  {users.filter(u => u.role === selectedRole).map(u => (
                     <div key={u.id} className="row" style={{ gap: 6, padding: '4px 10px', background: '#fff', border: '1px solid var(--line)', borderRadius: 999, fontSize: 13 }}>
                       <Avatar user={u} size="xs" />
                       <span>{u.name.split(' ')[0]}</span>
                     </div>
                   ))}
-                  {ALL_USERS.filter(u => u.role.toLowerCase().includes(selectedRole.split(' ')[0].toLowerCase())).length === 0 && (
+                  {users.filter(u => u.role === selectedRole).length === 0 && (
                     <span className="muted" style={{ fontSize: 13 }}>Aucun utilisateur pour ce rôle</span>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showInvite && (
-        <div className="modal-bg" onClick={() => setShowInvite(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)' }}><h2>Inviter un utilisateur</h2></div>
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div><label className="label">Adresse e-mail *</label><input className="input" type="email" placeholder="prenom.nom@cfa-horizon.re" /></div>
-              <div><label className="label">Prénom et nom</label><input className="input" placeholder="Prénom Nom" /></div>
-              <div>
-                <label className="label">Rôle *</label>
-                <select className="input">
-                  {Object.keys(ROLE_PERMS).map(r => <option key={r}>{r}</option>)}
-                </select>
-              </div>
-              <div style={{ padding: 12, background: 'var(--accent-soft)', borderRadius: 8, fontSize: 13, color: 'var(--accent-ink)' }}>
-                <Icon name="info" size={13} /> Un e-mail d'invitation sera envoyé avec un lien de connexion sécurisé (expire sous 48 h).
-              </div>
-            </div>
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setShowInvite(false)}>Annuler</button>
-              <button className="btn primary" onClick={() => { setShowInvite(false); showToast({ message: 'Invitation envoyée avec succès', icon: 'send' }); }}>
-                <Icon name="send" size={13} /> Envoyer l'invitation
-              </button>
             </div>
           </div>
         </div>

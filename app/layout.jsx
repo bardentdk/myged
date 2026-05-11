@@ -1,6 +1,7 @@
 import './globals.css';
 import { ToastProvider } from '@/lib/context/ToastContext';
 import { DocsProvider } from '@/lib/context/DocsContext';
+import { NotificationsProvider } from '@/lib/context/NotificationsContext';
 
 export const metadata = {
   title: "Mar'my GED",
@@ -12,9 +13,11 @@ export default function RootLayout({ children }) {
     <html lang="fr">
       <body>
         <DocsProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <NotificationsProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </NotificationsProvider>
         </DocsProvider>
       </body>
     </html>

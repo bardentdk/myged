@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import Icon from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Atoms';
 import { ME } from '@/lib/data';
+import { useNotifications } from '@/lib/context/NotificationsContext';
 
 const NAV = [
   { section: 'PRINCIPAL', items: [
@@ -28,6 +29,7 @@ const NAV = [
 
 export default function Sidebar({ productName = "Mar'my GED" }) {
   const pathname = usePathname();
+  const { unreadCount } = useNotifications();
 
   const isActive = (href) => {
     if (href === '/') return pathname === '/';
@@ -73,7 +75,9 @@ export default function Sidebar({ productName = "Mar'my GED" }) {
                 >
                   <Icon name={item.icon} size={15} className="ic" />
                   <span>{item.label}</span>
-                  {item.count != null && <span className="count">{item.count}</span>}
+                  {item.id === 'notifications' && unreadCount > 0
+                    ? <span className="count" style={{ background: 'var(--accent)', color: '#fff' }}>{unreadCount}</span>
+                    : item.count != null && <span className="count">{item.count}</span>}
                 </motion.div>
               </Link>
             ))}
