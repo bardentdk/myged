@@ -48,13 +48,14 @@ button { font-family: inherit; }
 ::selection { background: var(--accent-soft); color: var(--accent-ink); }
 
 /* ============ App shell ============ */
-.app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.app { display: flex; min-height: 100vh; }
 .sidebar {
   background: var(--surface-2); border-right: 1px solid var(--line);
   display: flex; flex-direction: column;
   position: sticky; top: 0; height: 100vh;
+  transition: width 0.25s;
 }
-.main { display: flex; flex-direction: column; min-width: 0; }
+.main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .topbar {
   height: 56px; border-bottom: 1px solid var(--line);
   background: rgba(250,250,249,.85); backdrop-filter: blur(12px);

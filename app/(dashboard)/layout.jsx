@@ -9,10 +9,11 @@ import AiPanel from '@/components/screens/AiPanel';
 
 export default function DashboardLayout({ children }) {
   const [aiOpen, setAiOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="app">
-      <Sidebar />
+    <div className="app" style={{ '--sidebar-w': collapsed ? '60px' : '220px' }}>
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v => !v)} />
       <main className="main">
         <Topbar aiEnabled={true} onOpenAi={() => setAiOpen(true)} />
         <PageTransition>

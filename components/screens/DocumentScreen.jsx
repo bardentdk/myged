@@ -28,6 +28,12 @@ export default function DocumentScreen({ id }) {
   const [showShare, setShowShare] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [signatures, setSignatures] = useState([
+    { id: 's1', user: 'jb',     role: 'Directeur',             status: 'signed',  signedAt: '14 mars 2026 · 10:22' },
+    { id: 's2', user: 'sylvie', role: 'Responsable admin',     status: 'pending', signedAt: null },
+    { id: 's3', user: 'anne',   role: 'Assistante admin',      status: 'pending', signedAt: null },
+  ]);
 
   if (!doc) return <div className="page" style={{ paddingTop: 40, textAlign: 'center' }} ><p className="muted">Document introuvable.</p></div>;
 
@@ -64,6 +70,21 @@ export default function DocumentScreen({ id }) {
     updateDoc(doc.id, { status: newStatus });
     const labels = { review: 'envoyé en validation', validated: 'validé', rejected: 'refusé', draft: 'remis en brouillon' };
     showToast({ message: `Document ${labels[newStatus] || newStatus}`, icon: 'check' });
+  };
+
+  const handleSign = (id) => {
+    const time = new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' });
+    setSignatures(ss => ss.map(s => s.id === id ? { ...s, status: 'signed', signedAt: 'aujourd\'hui · ' + time } : s));
+    showToast({ message: 'Signature apposée avec succès', type: 'success' });
+  };
+
+  const handleSignRequest = (userId) => {
+    showToast({ type: 'info', message: 'Demande de signature envoyée à ' + (USERS[userId]?.name || userId) });
+  };
+
+  const handleAddSigner = (userId) => {
+    setSignatures(ss => [...ss, { id: 's' + Date.now(), user: userId, role: USERS[userId]?.role || '', status: 'pending', signedAt: null }]);
+    showToast({ type: 'success', message: (USERS[userId]?.name || userId) + ' ajouté·e comme signataire' });
   };
 
   return (
@@ -116,6 +137,15 @@ export default function DocumentScreen({ id }) {
           </button>
           <button className="btn sm" onClick={() => setShowShare(true)}>
             <Icon name="share" size={13} /> Partager
+          </button>
+          <button className="btn sm" onClick={() => setShowSignature(true)}
+            style={{ color: signatures.some(s => s.status === 'pending') ? 'var(--warn)' : undefined }}>
+            <Icon name="edit" size={13} /> Signatures
+            {signatures.filter(s => s.status === 'pending').length > 0 && (
+              <span style={{ background: 'var(--warn)', color: '#fff', borderRadius: 999, padding: '0 5px', fontSize: 10, fontWeight: 700 }}>
+                {signatures.filter(s => s.status === 'pending').length}
+              </span>
+            )}
           </button>
           <button className="btn sm" onClick={() => setShowUpload(true)}>
             <Icon name="upload" size={13} /> Nouvelle version
@@ -196,6 +226,7 @@ export default function DocumentScreen({ id }) {
 
         <aside className="col" style={{ gap: 14 }}>
           <DetailsCard doc={doc} isLocked={isLocked} lockOwner={lockOwner} onEdit={() => setShowEdit(true)} />
+          <SignaturesCard signatures={signatures} onOpen={() => setShowSignature(true)} />
           <RelatedCard />
           <TagsCard doc={doc} onSave={(tags) => updateDoc(doc.id, { tags })} />
         </aside>
@@ -211,6 +242,7 @@ export default function DocumentScreen({ id }) {
         {showUpload && <UploadVersionModal onClose={() => setShowUpload(false)} onSave={handleUploadVersion} />}
         {showShare  && <ShareModal doc={doc} onClose={() => setShowShare(false)} />}
         {showDelete && <DeleteConfirmModal doc={doc} onCancel={() => setShowDelete(false)} onConfirm={handleDelete} />}
+        {showSignature && <SignatureModal doc={doc} signatures={signatures} onClose={() => setShowSignature(false)} onSign={handleSign} onRequest={handleSignRequest} onAdd={handleAddSigner} />}
       </AnimatePresence>
     </div>
   );
@@ -802,5 +834,208 @@ const TagsCard = ({ doc, onSave }) => {
         {!editing && tags.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Aucun tag</span>}
       </div>
     </div>
+  );
+};
+
+/* ─── Signatures sidebar card ───────────────────────────────────────────── */
+const SignaturesCard = ({ signatures, onOpen }) => {
+  const signed  = signatures.filter(s => s.status === 'signed').length;
+  const pending = signatures.filter(s => s.status === 'pending').length;
+  return (
+    <div className="card">
+      <div className="card-hd" style={{ cursor: 'pointer' }} onClick={onOpen}>
+        <div className="row" style={{ gap: 8 }}>
+          <Icon name="edit" size={14} style={{ color: 'var(--ink-3)' }} />
+          <h3 style={{ fontSize: 13 }}>Signatures ({signed}/{signatures.length})</h3>
+        </div>
+        {pending > 0 && <Badge kind="warn" dot>{pending} en attente</Badge>}
+      </div>
+      <div style={{ padding: '4px 18px 12px' }}>
+        <div style={{ height: 4, background: 'var(--surface-3)', borderRadius: 999, overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{ width: `${(signed / signatures.length) * 100}%`, height: '100%', background: 'var(--ok)', borderRadius: 999, transition: 'width .4s' }} />
+        </div>
+        {signatures.map(s => {
+          const u = USERS[s.user];
+          if (!u) return null;
+          return (
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+              <Avatar user={u} size="xs" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 500 }} className="truncate">{u.name.split(' ')[0]}</div>
+                <div className="micro truncate">{s.role}</div>
+              </div>
+              {s.status === 'signed'
+                ? <Icon name="checkCircle" size={14} style={{ color: 'var(--ok)', flexShrink: 0 }} />
+                : <Icon name="clock" size={14} style={{ color: 'var(--warn)', flexShrink: 0 }} />}
+            </div>
+          );
+        })}
+        <button className="btn sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }} onClick={onOpen}>
+          <Icon name="edit" size={12} /> Gérer les signatures
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Signature modal ───────────────────────────────────────────────────── */
+const SIGN_USERS = ['jb', 'sylvie', 'anne', 'melanie', 'thierry', 'marie'];
+
+const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd }) => {
+  const [tab, setTab] = useState('status');
+  const [drawMode, setDrawMode] = useState(false);
+  const [signed, setSigned] = useState(false);
+  const canvasRef = useRef(null);
+  const drawing = useRef(false);
+
+  const startDraw = (e) => {
+    drawing.current = true;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.beginPath(); ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY); }
+  };
+  const draw = (e) => {
+    if (!drawing.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY); ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke(); }
+  };
+  const stopDraw = () => { drawing.current = false; };
+  const clearCanvas = () => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, 400, 120);
+    setSigned(false);
+  };
+
+  const mySignature = signatures.find(s => s.user === ME.id);
+  const addableUsers = SIGN_USERS.filter(uid => !signatures.find(s => s.user === uid));
+
+  return (
+    <motion.div className="modal-bg" onClick={onClose}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}
+        initial={{ scale: 0.96, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 10 }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row" style={{ gap: 10 }}>
+            <Icon name="edit" size={16} style={{ color: 'var(--accent)' }} />
+            <h2>Signatures — {doc.name.replace(/\.\w+$/, '')}</h2>
+          </div>
+          <button className="btn ghost sm" style={{ padding: 4 }} onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+
+        <div style={{ padding: '0 24px', borderBottom: '1px solid var(--line)' }}>
+          <div className="tabs" style={{ border: 0 }}>
+            <span className={`tab ${tab === 'status' ? 'active' : ''}`} onClick={() => setTab('status')}>Statut</span>
+            <span className={`tab ${tab === 'sign' ? 'active' : ''}`} onClick={() => setTab('sign')}>Signer</span>
+            <span className={`tab ${tab === 'add' ? 'active' : ''}`} onClick={() => setTab('add')}>Ajouter</span>
+          </div>
+        </div>
+
+        <div style={{ padding: 24, minHeight: 280 }}>
+          {tab === 'status' && (
+            <div className="col" style={{ gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 10, marginBottom: 6 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Progression des signatures</div>
+                  <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ width: `${(signatures.filter(s => s.status === 'signed').length / signatures.length) * 100}%`, height: '100%', background: 'var(--ok)', borderRadius: 999, transition: 'width .4s' }} />
+                  </div>
+                </div>
+                <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--ok)', flexShrink: 0 }}>
+                  {signatures.filter(s => s.status === 'signed').length}/{signatures.length}
+                </span>
+              </div>
+              {signatures.map(s => {
+                const u = USERS[s.user];
+                if (!u) return null;
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 10, background: s.status === 'signed' ? 'var(--ok-soft)' : 'transparent' }}>
+                    <Avatar user={u} size="md" />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13.5 }}>{u.name}</div>
+                      <div className="micro">{s.role}</div>
+                      {s.signedAt && <div className="micro mono" style={{ color: 'var(--ok)' }}>Signé le {s.signedAt}</div>}
+                    </div>
+                    {s.status === 'signed'
+                      ? <Badge kind="ok" dot>Signé</Badge>
+                      : (
+                        <div className="row" style={{ gap: 6 }}>
+                          <Badge kind="warn" dot>En attente</Badge>
+                          <button className="btn sm ghost" onClick={() => onRequest(s.user)}>
+                            <Icon name="send" size={12} /> Relancer
+                          </button>
+                          {s.user === ME.id && (
+                            <button className="btn sm primary" onClick={() => { onSign(s.id); setTab('sign'); }}>
+                              <Icon name="edit" size={12} /> Signer
+                            </button>
+                          )}
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === 'sign' && (
+            <div className="col" style={{ gap: 16 }}>
+              <div style={{ padding: 14, background: 'var(--accent-soft)', borderRadius: 10, fontSize: 13, display: 'flex', gap: 10 }}>
+                <Icon name="info" size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>Vous apposez votre signature électronique sur <strong>{doc.name}</strong> v{doc.version}.<br />
+                <span className="micro">Conforme au règlement eIDAS (signature électronique simple)</span></div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>Dessinez votre signature</div>
+                <div style={{ position: 'relative', border: '1.5px solid var(--line-strong)', borderRadius: 10, overflow: 'hidden', cursor: 'crosshair', background: '#fff' }}>
+                  <canvas ref={canvasRef} width={532} height={120}
+                    onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                    onMouseMoveCapture={() => setSigned(true)}
+                    style={{ display: 'block', width: '100%' }} />
+                  <div style={{ position: 'absolute', bottom: 8, left: 14, fontSize: 11, color: 'var(--ink-4)', pointerEvents: 'none' }}>
+                    {!signed ? 'Tracez votre signature ici…' : ''}
+                  </div>
+                  <button className="btn ghost sm" style={{ position: 'absolute', bottom: 6, right: 6, padding: '2px 8px', fontSize: 11 }} onClick={clearCanvas}>
+                    Effacer
+                  </button>
+                </div>
+              </div>
+              <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--ink-3)', display: 'flex', gap: 8 }}>
+                <Icon name="clock" size={13} style={{ flexShrink: 0 }} />
+                <span>Horodatée par le serveur · IP et identifiant enregistrés · <span className="mono">{new Date().toLocaleDateString('fr-FR')}</span></span>
+              </div>
+            </div>
+          )}
+
+          {tab === 'add' && (
+            <div className="col" style={{ gap: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 4 }}>Ajoutez des signataires supplémentaires :</div>
+              {addableUsers.length === 0
+                ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Tous les utilisateurs ont déjà été ajoutés.</div>
+                : addableUsers.map(uid => {
+                    const u = USERS[uid];
+                    if (!u) return null;
+                    return (
+                      <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: '1px solid var(--line)', borderRadius: 10 }}>
+                        <Avatar user={u} size="md" />
+                        <div style={{ flex: 1 }}><div style={{ fontWeight: 500, fontSize: 13.5 }}>{u.name}</div><div className="micro">{u.role}</div></div>
+                        <button className="btn sm primary" onClick={() => { onAdd(uid); }}>
+                          <Icon name="plus" size={12} /> Ajouter
+                        </button>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn" onClick={onClose}>Fermer</button>
+          {tab === 'sign' && (
+            <button className="btn primary" onClick={() => { const ms = signatures.find(s => s.user === ME.id); if (ms) onSign(ms.id); onClose(); }}>
+              <Icon name="edit" size={13} /> Confirmer la signature
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
