@@ -59,6 +59,12 @@ const Icon = ({ name, size = 16, className = '', style = {} }) => {
     comment:    <path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3Z"/>,
     restore:    <><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></>,
     sign:       <><path d="M3 17c4 0 4-10 7-10s3 8 7 8 4-4 4-4"/><path d="M3 21h18"/></>,
+    trash:      <><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></>,
+    globe:      <><circle cx="12" cy="12" r="9"/><path d="M2 12h20"/><path d="M12 3a15 15 0 0 1 4 9 15 15 0 0 1-4 9 15 15 0 0 1-4-9 15 15 0 0 1 4-9z"/></>,
+    copy:       <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+    pencil:     <><path d="M17 3a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></>,
+    move:       <><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></>,
+    zoomIn:     <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6"/><path d="M8 11h6"/></>,
   };
   return P(I[name] || <circle cx="12" cy="12" r="3"/>);
 };

@@ -4,17 +4,19 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge, Spinner, EmptyState } from '@/components/ui/Atoms';
-import { USERS, DOCS } from '@/lib/data';
+import { useDocs } from '@/lib/context/DocsContext';
+import { USERS } from '@/lib/data';
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { docs } = useDocs();
   const [query, setQuery] = useState('convention OPCO');
   const [filters, setFilters] = useState({ type: 'all', status: 'all', author: 'all', expiring: false, tags: '' });
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(true);
   const [preview, setPreview] = useState(null);
 
-  const results = DOCS.filter((d) => {
+  const results = docs.filter((d) => {
     if (!query) return true;
     const q = query.toLowerCase();
     return d.name.toLowerCase().includes(q) || d.tags.some((t) => t.includes(q)) || d.folder.toLowerCase().includes(q);
@@ -37,7 +39,7 @@ export default function SearchScreen() {
     <div className="page" style={{ paddingTop: 22 }}>
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ marginBottom: 4 }}>Recherche avancée</h1>
-        <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>Recherche dans 247 documents · OCR activé sur les PDF scannés</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>Recherche dans {docs.length} documents · OCR activé sur les PDF scannés</p>
       </div>
 
       <form onSubmit={doSearch}>
