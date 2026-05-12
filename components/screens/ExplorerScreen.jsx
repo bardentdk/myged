@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { FOLDERS } from '@/lib/data';
+import { FOLDERS, USERS } from '@/lib/data';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/lib/context/UserContext';
 
@@ -174,8 +174,9 @@ function UploadQueue({ items, onDismiss }) {
 /* ─── Main drive screen ─── */
 export default function ExplorerScreen() {
   const router = useRouter();
-  const { docs, addDoc, deleteDoc, loading } = useDocs();
+  const { docs, addDoc, deleteDoc, loading, getProfile } = useDocs();
   const { profile } = useUser();
+  const resolveOwner = (id) => { const p = getProfile(id); return p ? { name: p.full_name || p.email || '?', avatar_url: p.avatar_url } : (USERS[id] || { name: id || '?', avatar_url: null }); };
   const { showToast } = useToast();
 
   const [folder, setFolder] = useState(null);
@@ -561,8 +562,8 @@ export default function ExplorerScreen() {
                       <td className="mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>v{doc.version}</td>
                       <td>
                         <div className="row" style={{ gap: 6 }}>
-                          <Avatar user={USERS[doc.owner]} size="xs" />
-                          <span style={{ fontSize: 12.5 }}>{USERS[doc.owner]?.name.split(' ')[0] || doc.owner}</span>
+                          <Avatar user={resolveOwner(doc.owner)} size="xs" />
+                          <span style={{ fontSize: 12.5 }}>{resolveOwner(doc.owner).name.split(' ')[0]}</span>
                         </div>
                       </td>
                       <td style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{doc.updatedAt}</td>
@@ -605,7 +606,7 @@ export default function ExplorerScreen() {
                     <div className="micro truncate" style={{ marginBottom: 8 }}>{doc.folder}</div>
                     <div className="row" style={{ justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)' }}>
                       <div className="row" style={{ gap: 5 }}>
-                        <Avatar user={USERS[doc.owner]} size="xs" />
+                        <Avatar user={resolveOwner(doc.owner)} size="xs" />
                         <span className="mono">v{doc.version}</span>
                       </div>
                       <div className="row" style={{ gap: 4 }}>
