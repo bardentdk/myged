@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Atoms';
-import { ME } from '@/lib/data';
 import { useNotifications } from '@/lib/context/NotificationsContext';
+import { useUser } from '@/lib/context/UserContext';
 
 const NAV = [
   { section: 'PRINCIPAL', items: [
@@ -31,6 +31,9 @@ const NAV = [
 export default function Sidebar({ productName = "Mar'my GED", collapsed = false, onToggle }) {
   const pathname = usePathname();
   const { unreadCount } = useNotifications();
+  const { profile } = useUser();
+  const displayName = profile?.full_name || profile?.email || '—';
+  const displayRole = profile?.role || '';
 
   const isActive = (href) => {
     if (href === '/') return pathname === '/';
@@ -132,12 +135,12 @@ export default function Sidebar({ productName = "Mar'my GED", collapsed = false,
       {/* Footer */}
       <div className="sidebar-foot">
         <div className="row" style={{ padding: '6px 8px', gap: 10, justifyContent: collapsed ? 'center' : undefined }}>
-          <Avatar user={ME} size="lg" />
+          <Avatar user={{ name: displayName, color: '#6366f1' }} size="lg" />
           <AnimatePresence>
             {!collapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }} className="truncate">{ME.name}</div>
-                <div className="micro truncate">{ME.role}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }} className="truncate">{displayName}</div>
+                <div className="micro truncate">{displayRole}</div>
               </motion.div>
             )}
           </AnimatePresence>

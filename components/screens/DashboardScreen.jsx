@@ -8,7 +8,8 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useNotifications } from '@/lib/context/NotificationsContext';
-import { USERS, ME } from '@/lib/data';
+import { USERS } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 function KpiCard({ label, value, delta, deltaCls, icon, index }) {
   const valRef = useRef(null);
@@ -38,6 +39,8 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { docs, loading, getProfile } = useDocs();
   const { unreadCount } = useNotifications();
+  const { profile } = useUser();
+  const firstName = (profile?.full_name || profile?.email || 'vous').split(/[\s@]/)[0];
 
   const lockedDocs     = docs.filter((d) => d.lockedBy);
   const pendingDocs    = docs.filter((d) => d.status === 'review' || d.status === 'pending');
@@ -72,7 +75,7 @@ export default function DashboardScreen() {
     <div className="page">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 22, alignItems: 'flex-end' }}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>Bonjour {ME.name.split(' ')[0]}</h1>
+          <h1 style={{ marginBottom: 4 }}>Bonjour {firstName}</h1>
           <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
             {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} · Vous avez{' '}
             <strong style={{ color: pendingTasks > 0 ? 'var(--ink)' : 'var(--ok)' }}>{pendingTasks} tâche{pendingTasks !== 1 ? 's' : ''}</strong> en attente.

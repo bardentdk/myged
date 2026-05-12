@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Atoms';
-import { ME } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 const CRUMBS = {
   '/':              ['CFA Horizon Réunion', 'Tableau de bord'],
@@ -21,6 +21,7 @@ const CRUMBS = {
 export default function Topbar({ aiEnabled = true, onOpenAi }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { profile } = useUser();
 
   const crumb = CRUMBS[pathname] ||
     (pathname.startsWith('/documents/') ? ['CFA Horizon Réunion', 'Documents', 'Document'] : CRUMBS['/']);
@@ -54,7 +55,7 @@ export default function Topbar({ aiEnabled = true, onOpenAi }) {
           <Icon name="bell" size={15} />
           <span style={{ position: 'absolute', top: 4, right: 6, width: 6, height: 6, borderRadius: 999, background: 'var(--err)' }} />
         </button>
-        <Avatar user={ME} size="md" />
+        <Avatar user={{ name: profile?.full_name || profile?.email || '—', color: '#6366f1' }} size="md" />
       </div>
     </header>
   );

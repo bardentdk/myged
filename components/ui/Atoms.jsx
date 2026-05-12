@@ -1,19 +1,23 @@
 import Icon from './Icon';
 import { STATUS_MAP } from '@/lib/data';
 
-export const initials = (name) =>
-  name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+export const initials = (name) => {
+  if (!name) return '?';
+  return name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+};
 
 export const Avatar = ({ user, size = 'md', ring = false }) => {
   if (!user) return null;
-  const cls = `av ${size === 'md' ? '' : size}`;
+  const name  = user.name || user.full_name || user.email || '?';
+  const color = user.color || '#6366f1';
+  const cls   = `av ${size === 'md' ? '' : size}`;
   return (
     <span
       className={cls}
-      style={{ background: user.color, boxShadow: ring ? '0 0 0 2px #fff' : 'none' }}
-      title={user.name}
+      style={{ background: color, boxShadow: ring ? '0 0 0 2px #fff' : 'none' }}
+      title={name}
     >
-      {initials(user.name)}
+      {initials(name)}
     </span>
   );
 };
@@ -33,7 +37,7 @@ export const Badge = ({ children, kind = 'neutral', dot = false }) => (
 
 export const StatusBadge = ({ status }) => {
   const s = STATUS_MAP[status] || STATUS_MAP.draft;
-  return <Badge kind={s.cls.replace('b-', '')} dot>{s.label}</Badge>;
+  return <Badge kind={s.kind} dot>{s.label}</Badge>;
 };
 
 export const FileIcon = ({ type, size = 28 }) => {
