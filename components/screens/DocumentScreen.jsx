@@ -12,7 +12,14 @@ import { useDocs } from '@/lib/context/DocsContext';
 export default function DocumentScreen({ id }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const { docs, comments, versions, updateDoc, addComment, deleteComment, addVersion, deleteDoc } = useDocs();
+  const { docs, comments, versions, updateDoc, addComment, deleteComment, addVersion, deleteDoc, getProfile } = useDocs();
+
+  const resolveUser = (id) => {
+    if (!id) return null;
+    const p = getProfile(id);
+    if (p) return { id: p.id, name: p.full_name || p.email || 'Utilisateur', role: p.role || '', color: '#64748b', avatar_url: p.avatar_url };
+    return USERS[id] || { id, name: id, role: '', color: '#64748b' };
+  };
 
   const doc = docs.find(d => d.id === id) || docs[0];
   const docVersions = versions[doc?.id] || [];
@@ -39,7 +46,7 @@ export default function DocumentScreen({ id }) {
 
   const isLocked = !!doc.lockedBy && scenario !== 'released';
   const lockedByMe = doc.lockedBy === ME.id;
-  const lockOwner = isLocked ? USERS[doc.lockedBy] : null;
+  const lockOwner = isLocked ? resolveUser(doc.lockedBy) : null;
 
   const handleSaveEdit = (changes) => {
     updateDoc(doc.id, changes);
@@ -105,7 +112,7 @@ export default function DocumentScreen({ id }) {
           </div>
           <div className="micro row" style={{ gap: 6 }}>
             <span>{doc.folder}</span><span>·</span><span>{doc.size}</span><span>·</span>
-            <span>Modifié {doc.updatedAt} par {USERS[doc.updatedBy]?.name?.split(' ')[0]}</span>
+            <span>Modifié {doc.updatedAt} par {resolveUser(doc.updatedBy)?.name?.split(' ')[0]}</span>
             {doc.expires && (<><span>·</span><span>Expire le <span className="mono">{doc.expires}</span></span></>)}
           </div>
         </div>
@@ -582,7 +589,7 @@ const VersionsList = ({ docId, docVersions, onUpload }) => (
       </div>
     )}
     {docVersions.map((v, i) => {
-      const u = USERS[v.author];
+      const u = resolveUser(v.author);
       return (
         <div key={v.v} style={{ display: 'flex', gap: 14, padding: '14px 22px', borderBottom: i < docVersions.length - 1 ? '1px solid var(--line)' : 0, background: v.current ? 'var(--accent-soft)' : 'transparent', position: 'relative' }}>
           {v.current && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: 'var(--accent)' }} />}
@@ -624,7 +631,7 @@ const ActivityList = () => {
   return (
     <div style={{ padding: '8px 22px' }}>
       {items.map((a, i) => {
-        const u = USERS[a.who];
+        const u = resolveUser(a.who);
         return (
           <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < items.length - 1 ? '1px solid var(--line)' : 0 }}>
             <Avatar user={u} size="md" />
@@ -658,14 +665,14 @@ const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
   return (
     <div style={{ padding: 22 }}>
       {comments.map((c, i) => {
-        const u = USERS[c.who];
+        const u = resolveUser(c.who);
         return (
           <div key={c.id} style={{ display: 'flex', gap: 12, padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
             <Avatar user={u} size="lg" />
             <div style={{ flex: 1 }}>
               <div className="row" style={{ gap: 8, marginBottom: 4, justifyContent: 'space-between' }}>
                 <div className="row" style={{ gap: 8 }}>
-                  <strong style={{ fontSize: 13, fontWeight: 500 }}>{u.name}</strong>
+                  <strong style={{ fontSize: 13, fontWeight: 500 }}>{u?.name}</strong>
                   <span className="micro">{c.when}</span>
                 </div>
                 {c.who === 'anne' && (
@@ -716,10 +723,10 @@ const PermissionsTable = () => {
         <thead><tr><th>Utilisateur</th><th>Rôle</th>{Object.entries(labels).map(([k,v]) => <th key={k} style={{ textAlign: 'center', padding: '8px 4px' }}>{v}</th>)}</tr></thead>
         <tbody>
           {rows.map(r => {
-            const u = USERS[r.who];
+            const u = resolveUser(r.who);
             return (
               <tr key={r.who} style={{ cursor: 'default' }}>
-                <td><div className="row" style={{ gap: 8 }}><Avatar user={u} size="md" /><span style={{ fontSize: 13, fontWeight: 500 }}>{u.name}</span></div></td>
+                <td><div className="row" style={{ gap: 8 }}><Avatar user={u} size="md" /><span style={{ fontSize: 13, fontWeight: 500 }}>{u?.name}</span></div></td>
                 <td><span className="micro">{r.role}</span></td>
                 {Object.keys(labels).map(k => (
                   <td key={k} style={{ textAlign: 'center' }}>
@@ -741,7 +748,7 @@ const DetailsCard = ({ doc, isLocked, lockOwner, onEdit }) => {
   const rows = [
     { label: 'Statut',          v: <StatusBadge status={doc.status} /> },
     { label: 'Version',         v: <span className="mono">v{doc.version}</span> },
-    { label: 'Propriétaire',    v: <span className="row" style={{ gap: 6 }}><Avatar user={USERS[doc.owner]} size="xs" />{USERS[doc.owner]?.name}</span> },
+    { label: 'Propriétaire',    v: <span className="row" style={{ gap: 6 }}><Avatar user={resolveUser(doc.owner)} size="xs" />{resolveUser(doc.owner)?.name}</span> },
     { label: 'Taille',          v: <span className="mono">{doc.size}</span> },
     { label: 'Confidentialité', v: <Badge kind={doc.confidential === 'Confidentiel' ? 'violet' : 'neutral'} dot>{doc.confidential}</Badge> },
     { label: 'Expiration',      v: doc.expires ? <span className="mono">{doc.expires}</span> : <span className="muted">—</span> },

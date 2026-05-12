@@ -1,4 +1,5 @@
 import './globals.css';
+import { UserProvider } from '@/lib/context/UserContext';
 import { ToastProvider } from '@/lib/context/ToastContext';
 import { DocsProvider } from '@/lib/context/DocsContext';
 import { NotificationsProvider } from '@/lib/context/NotificationsContext';
@@ -12,6 +13,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="fr">
       <body>
+        <UserProvider>
         <DocsProvider>
           <NotificationsProvider>
             <ToastProvider>
@@ -19,6 +21,7 @@ export default function RootLayout({ children }) {
             </ToastProvider>
           </NotificationsProvider>
         </DocsProvider>
+        </UserProvider>
       </body>
     </html>
   );

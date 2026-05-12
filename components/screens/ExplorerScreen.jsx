@@ -7,7 +7,9 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { USERS, ME, FOLDERS } from '@/lib/data';
+import { FOLDERS } from '@/lib/data';
+import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/lib/context/UserContext';
 
 /* ─── New document modal ─── */
 const FOLDER_OPTIONS = FOLDERS.map((f) => f.name);
@@ -34,15 +36,31 @@ function NewDocModal({ onClose }) {
     if (f) { setFile(f); if (!form.name) setForm((p) => ({ ...p, name: f.name.replace(/\.[^.]+$/, '') })); }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) return;
-    const id = `d${Date.now()}`;
     const ext = { doc: '.docx', pdf: '.pdf', xls: '.xlsx', img: '.png' }[form.type] || '';
     const nameWithExt = form.name.endsWith(ext) ? form.name : form.name + ext;
     const tags = form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
-    addDoc({ id, name: nameWithExt, type: form.type, folder: form.folder, size: file ? `${Math.round(file.size / 1024)} Ko` : '—', version: '1.0', status: form.status, owner: ME.id, updatedBy: ME.id, updatedAt: "à l'instant", tags, confidential: form.confidential, expires: form.expires || null });
+
+    // If a physical file was attached, upload to Storage first
+    let storagePath = null;
+    const supabase = createClient();
+    if (file && supabase) {
+      const path = `${Date.now()}-${nameWithExt.replace(/\s+/g, '_')}`;
+      const { data } = await supabase.storage.from('documents').upload(path, file, { upsert: false });
+      storagePath = data?.path ?? null;
+    }
+
+    const created = await addDoc({
+      name: nameWithExt, type: form.type, folder: form.folder,
+      size: file ? `${Math.round(file.size / 1024)} Ko` : '—',
+      version: '1.0', status: form.status, tags,
+      confidential: form.confidential, expires_at: form.expires || null,
+      storage_path: storagePath,
+    });
     showToast({ type: 'success', message: 'Document créé avec succès' });
-    onClose(); router.push(`/documents/${id}`);
+    onClose();
+    if (created?.id) router.push(`/documents/${created.id}`);
   };
 
   return (
@@ -156,7 +174,8 @@ function UploadQueue({ items, onDismiss }) {
 /* ─── Main drive screen ─── */
 export default function ExplorerScreen() {
   const router = useRouter();
-  const { docs, deleteDoc } = useDocs();
+  const { docs, addDoc, deleteDoc, loading } = useDocs();
+  const { profile } = useUser();
   const { showToast } = useToast();
 
   const [folder, setFolder] = useState(null);
@@ -216,17 +235,40 @@ export default function ExplorerScreen() {
     };
   }, [handleWindowDragEnter, handleWindowDragLeave, handleWindowDrop]);
 
-  const simulateUpload = (file) => {
-    const id = Date.now().toString();
-    const item = { id, name: file.name, size: `${Math.round(file.size / 1024)} Ko`, progress: 0 };
-    setUploads((u) => [...u, item]);
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 25 + 10;
-      if (progress >= 100) { progress = 100; clearInterval(interval); }
-      setUploads((u) => u.map((x) => x.id === id ? { ...x, progress: Math.round(progress) } : x));
-    }, 300);
-    showToast({ type: 'info', message: `Téléversement de ${file.name}…` });
+  const simulateUpload = async (file) => {
+    const uploadId = Date.now().toString();
+    const sizeStr = `${Math.round(file.size / 1024)} Ko`;
+    setUploads((u) => [...u, { id: uploadId, name: file.name, size: sizeStr, progress: 10 }]);
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    const typeMap = { pdf: 'pdf', docx: 'doc', doc: 'doc', xlsx: 'xls', xls: 'xls', png: 'img', jpg: 'img', jpeg: 'img', zip: 'zip' };
+    const docType = typeMap[ext] || 'doc';
+    const storagePath = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+
+    let storedPath = null;
+    const supabase = createClient();
+    if (supabase) {
+      setUploads((u) => u.map((x) => x.id === uploadId ? { ...x, progress: 40 } : x));
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('documents')
+        .upload(storagePath, file, { contentType: file.type, upsert: false });
+      if (!storageError) storedPath = storageData?.path ?? storagePath;
+      else console.warn('Storage upload error (bucket may not exist):', storageError.message);
+    }
+
+    setUploads((u) => u.map((x) => x.id === uploadId ? { ...x, progress: 75 } : x));
+
+    const doc = await addDoc({
+      name: file.name, type: docType,
+      folder: breadcrumb.length > 0 ? breadcrumb.map(b => b.name).join(' / ') : 'Sans dossier',
+      size: sizeStr, version: '1.0', status: 'draft',
+      tags: [], confidential: 'Interne',
+      storage_path: storedPath,
+    });
+
+    setUploads((u) => u.map((x) => x.id === uploadId ? { ...x, progress: 100 } : x));
+    if (doc) showToast({ type: 'success', message: `${file.name} importé avec succès` });
+    else showToast({ type: 'warn', message: `Métadonnées sauvegardées (vérifiez la connexion)` });
   };
 
   const toggleSelect = (id, e) => {
@@ -438,12 +480,42 @@ export default function ExplorerScreen() {
             </div>
           </div>
 
-          {/* Drop hint */}
-          {!filtered.length && (
+          {/* Loading */}
+          {loading && (
             <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
-              <Icon name="folder" size={36} style={{ marginBottom: 12, opacity: .4 }} />
-              <div style={{ fontWeight: 500, marginBottom: 4 }}>Aucun document</div>
-              <div style={{ fontSize: 13 }}>Glissez-déposez des fichiers ici ou créez un nouveau document</div>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--line)', borderTopColor: 'var(--accent)', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+              <div style={{ fontSize: 13 }}>Chargement des documents…</div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !filtered.length && (
+            <div style={{ textAlign: 'center', padding: '70px 32px', color: 'var(--ink-3)' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <Icon name="upload" size={28} style={{ color: 'var(--accent)' }} />
+              </div>
+              {docs.length === 0 ? (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Votre GED est vide</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 320, margin: '0 auto 20px' }}>
+                    Commencez par importer des documents en les glissant ici, ou créez votre premier document.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                    <button className="btn primary" onClick={() => setShowNew(true)}>
+                      <Icon name="plus" size={13} /> Créer un document
+                    </button>
+                    <button className="btn" onClick={() => document.getElementById('drive-upload')?.click()}>
+                      <Icon name="upload" size={13} /> Importer des fichiers
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 500, marginBottom: 4 }}>Aucun résultat</div>
+                  <div style={{ fontSize: 13 }}>Essayez de modifier les filtres ou la recherche</div>
+                </>
+              )}
             </div>
           )}
 

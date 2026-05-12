@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { USERS, ACTIVITY, QUALIOPI } from '@/lib/data';
+import { QUALIOPI } from '@/lib/data';
 
 /* ─── Tiny bar-chart component ─── */
 function BarChart({ data, height = 120, color = 'var(--accent)' }) {
@@ -87,7 +87,7 @@ function exportReport(docs, label) {
 
 export default function ReportingScreen() {
   const router = useRouter();
-  const { docs } = useDocs();
+  const { docs, getProfile } = useDocs();
   const { showToast } = useToast();
   const [period, setPeriod] = useState('month');
 
@@ -244,20 +244,25 @@ export default function ReportingScreen() {
         <div className="card">
           <div className="card-hd"><h2>Activité par utilisateur</h2></div>
           <div style={{ padding: '8px 22px' }}>
-            {byUser.map(([uid, count], i) => {
-              const u = USERS[uid];
-              if (!u) return null;
+            {byUser.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-4)', padding: '8px 0' }}>Aucune activité enregistrée.</p>
+            ) : byUser.map(([uid, count], i) => {
+              const p = getProfile(uid);
+              const name = p?.full_name || p?.email || 'Utilisateur';
+              const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+              const colors = ['#0ea5e9','#f59e0b','#10b981','#ef4444','#8b5cf6'];
+              const color = colors[i % colors.length];
               return (
                 <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < byUser.length - 1 ? '1px solid var(--line)' : 0 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: u.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
-                    {u.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+                    {initials || '?'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }} className="truncate">{u.name.split(' ')[0]}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }} className="truncate">{name.split(' ')[0]}</div>
                     <div style={{ height: 4, background: 'var(--surface-3)', borderRadius: 999, marginTop: 4, overflow: 'hidden' }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${(count / byUser[0][1]) * 100}%` }}
                         transition={{ delay: i * 0.1, duration: 0.5 }}
-                        style={{ height: '100%', borderRadius: 999, background: u.color }} />
+                        style={{ height: '100%', borderRadius: 999, background: color }} />
                     </div>
                   </div>
                   <span className="mono" style={{ fontSize: 13, color: 'var(--ink-3)', flexShrink: 0 }}>{count}</span>

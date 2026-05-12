@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { USERS, DOCS as INITIAL_DOCS } from '@/lib/data';
+import { USERS } from '@/lib/data';
 
 const TYPE_COLORS = {
   'Version publiée':   'var(--accent)',
@@ -46,7 +46,7 @@ export default function GlobalHistoryScreen() {
   const allEntries = useMemo(() => {
     const entries = [];
     Object.entries(versions).forEach(([docId, vlist]) => {
-      const doc = docs.find(d => d.id === docId) || INITIAL_DOCS.find(d => d.id === docId);
+      const doc = docs.find(d => d.id === docId);
       if (!doc) return;
       vlist.forEach(v => {
         entries.push({ ...v, docId, docName: doc.name, docType: doc.type });
@@ -213,7 +213,7 @@ export default function GlobalHistoryScreen() {
             <div className="card-hd"><h3>Documents versionnés</h3></div>
             <div style={{ padding: '8px 0' }}>
               {Object.keys(versions).map(docId => {
-                const doc = docs.find(d => d.id === docId) || INITIAL_DOCS.find(d => d.id === docId);
+                const doc = docs.find(d => d.id === docId);
                 const vlist = versions[docId] || [];
                 const current = vlist.find(v => v.current) || vlist[0];
                 if (!doc) return null;

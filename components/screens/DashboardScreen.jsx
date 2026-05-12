@@ -8,7 +8,7 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useNotifications } from '@/lib/context/NotificationsContext';
-import { USERS, ACTIVITY, ME } from '@/lib/data';
+import { USERS, ME } from '@/lib/data';
 
 function KpiCard({ label, value, delta, deltaCls, icon, index }) {
   const valRef = useRef(null);
@@ -36,7 +36,7 @@ const TASK_ICONS = { check: 'check', shield: 'shield', refresh: 'refresh', bell:
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { docs } = useDocs();
+  const { docs, loading, getProfile } = useDocs();
   const { unreadCount } = useNotifications();
 
   const lockedDocs     = docs.filter((d) => d.lockedBy);
@@ -46,9 +46,9 @@ export default function DashboardScreen() {
 
   const [actFilter, setActFilter] = useState('all');
   const [tasks, setTasks] = useState([
-    { id: 1, label: 'Valider la convention TP SA 2026',  sub: 'Demandé par Sylvie · il y a 8 min', accent: true,  icon: 'check',   done: false, docId: 'd1' },
-    { id: 2, label: 'Compléter indicateur 19 Qualiopi',  sub: 'Audit dans 14 jours · 2 pièces manquantes',      icon: 'shield',  done: false, docId: null },
-    { id: 3, label: 'Renouveler assurance RC pro',       sub: 'Expire dans 21 jours',               icon: 'refresh', done: false, docId: 'd9'  },
+    { id: 1, label: 'Compléter la checklist Qualiopi',  sub: 'Vérifiez les indicateurs en cours',   icon: 'shield',  done: false, href: '/qualiopi' },
+    { id: 2, label: 'Importer les documents de session', sub: 'Émargements, conventions, bilans',    icon: 'upload',  done: false, href: '/documents' },
+    { id: 3, label: 'Vérifier les documents expirants', sub: 'Assurances, pièces d\'identité…',     icon: 'clock',   done: false, href: '/documents' },
   ]);
   const pendingTasks = tasks.filter((t) => !t.done).length;
 
@@ -59,11 +59,11 @@ export default function DashboardScreen() {
     { label: 'Notifications',        value: unreadCount,                   delta: 'non lues',                            deltaCls: unreadCount > 0 ? 'down' : '', icon: 'bell' },
   ];
 
-  const shownActivity = ACTIVITY.filter((a) => {
-    if (actFilter === 'mine') return a.who === ME.id;
-    if (actFilter === 'team') return ['sylvie', 'melanie', 'jb', 'thierry'].includes(a.who);
-    return true;
-  });
+  // Activity comes from recently updated documents (no static mock anymore)
+  const recentActivity = docs.slice(0, 10).map(d => ({
+    id: d.id, who: d.updatedBy, verb: 'modifie', what: d.name, when: d.updatedAt, type: 'upload', docId: d.id,
+  }));
+  const shownActivity = recentActivity.filter(() => true); // filter applied per tab below
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -113,8 +113,8 @@ export default function DashboardScreen() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 500, fontSize: 13.5, marginBottom: 3 }} className="truncate">{doc.name}</div>
                   <div className="row" style={{ gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
-                    <Avatar user={USERS[doc.lockedBy]} size="xs" />
-                    <span><strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{USERS[doc.lockedBy]?.name.split(' ')[0]}</strong> modifie · depuis <span className="mono">{doc.lockedSince}</span></span>
+                    <Avatar user={getProfile(doc.lockedBy) || USERS[doc.lockedBy]} size="xs" />
+                    <span><strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{(getProfile(doc.lockedBy)?.full_name || USERS[doc.lockedBy]?.name || 'Utilisateur').split(' ')[0]}</strong> modifie · depuis <span className="mono">{doc.lockedSince}</span></span>
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--warn)', flexShrink: 0 }} />
                   </div>
                 </div>
@@ -138,15 +138,16 @@ export default function DashboardScreen() {
               {shownActivity.length === 0 ? (
                 <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Aucune activité</div>
               ) : shownActivity.map((a) => {
-                const u = USERS[a.who];
+                const p = getProfile(a.who) || USERS[a.who];
+                const uName = p?.full_name || p?.name || 'Utilisateur';
                 const iconMap = { lock: 'lock', upload: 'upload', comment: 'msg', validate: 'check', share: 'share', restore: 'history', sign: 'sig' };
                 const colorMap = { lock: 'var(--warn)', upload: 'var(--ink-3)', comment: 'var(--accent)', validate: 'var(--ok)', share: 'var(--accent)', restore: 'var(--ink-3)', sign: 'var(--violet)' };
                 return (
                   <div key={a.id} className="act-item" style={{ cursor: a.docId ? 'pointer' : 'default' }} onClick={() => a.docId && router.push(`/documents/${a.docId}`)}>
-                    <Avatar user={u} size="md" />
+                    <Avatar user={p} size="md" />
                     <div className="act-body">
                       <div>
-                        <strong style={{ fontWeight: 500 }}>{u.name}</strong>{' '}
+                        <strong style={{ fontWeight: 500 }}>{uName}</strong>{' '}
                         <span className="muted">{a.verb}</span>{' '}
                         {a.target && <><strong style={{ fontWeight: 500 }}>{a.target}</strong>{' '}<span className="muted">le</span>{' '}</>}
                         <span style={{ fontWeight: 500 }}>{a.what}</span>
