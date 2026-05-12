@@ -195,7 +195,7 @@ export default function ExplorerScreen() {
   /* filter & sort */
   const filtered = docs.filter((d) => {
     const matchFolder = !folder || d.folder.toLowerCase().includes(folder.toLowerCase());
-    const matchFilter = filter === 'all' || (filter === 'locked' && !!d.lockedBy) || (filter === 'review' && (d.status === 'review' || d.status === 'pending')) || (filter === 'mine' && d.owner === ME.id);
+    const matchFilter = filter === 'all' || (filter === 'locked' && !!d.lockedBy) || (filter === 'review' && (d.status === 'review' || d.status === 'pending')) || (filter === 'mine' && d.owner === profile?.id);
     const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.tags?.some((t) => t.includes(search.toLowerCase()));
     return matchFolder && matchFilter && matchSearch;
   }).sort((a, b) => {
@@ -451,7 +451,7 @@ export default function ExplorerScreen() {
               <div className="row" style={{ gap: 4 }}>
                 {[
                   { id: 'all',    label: 'Tous',        count: docs.length },
-                  { id: 'mine',   label: 'À moi',       count: docs.filter((d) => d.owner === ME.id).length },
+                  { id: 'mine',   label: 'À moi',       count: docs.filter((d) => d.owner === profile?.id).length },
                   { id: 'review', label: 'À valider',   count: docs.filter((d) => d.status === 'review' || d.status === 'pending').length },
                   { id: 'locked', label: 'Verrouillés', count: docs.filter((d) => !!d.lockedBy).length },
                 ].map((f) => (

@@ -121,7 +121,7 @@ export function DocsProvider({ children }) {
     if (error) { console.error('addDoc:', error.message); return null; }
     const mapped = mapDoc(data);
     setDocs(d => [mapped, ...d]);
-    if (user) await supabase.from('activity_log').insert({ user_id: user.id, action: 'upload', document_id: data.id, document_name: data.name }).catch(() => {});
+    if (user) await supabase.from('activity_log').insert({ user_id: user.id, action: 'upload', document_id: data.id, document_name: data.name }).then(() => {}, () => {});
     return mapped;
   }, []);
 
