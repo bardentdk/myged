@@ -7,7 +7,8 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { USERS, QUALIOPI, ME } from '@/lib/data';
+import { USERS, QUALIOPI } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 const STATUS_KIND   = { ok: 'ok', warn: 'warn', err: 'err', review: 'warn' };
 const STATUS_LABELS = { ok: 'Validé', warn: 'À compléter', err: 'Bloqué', review: 'En relecture' };
@@ -28,6 +29,7 @@ export default function QualiopiScreen() {
   const router = useRouter();
   const { docs, addDoc } = useDocs();
   const { showToast } = useToast();
+  const { profile: me } = useUser();
   const [selected, setSelected] = useState(11);
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -43,7 +45,7 @@ export default function QualiopiScreen() {
 
   const handleCreatePiece = (pieceName) => {
     const id = `d${Date.now()}`;
-    addDoc({ id, name: pieceName + '.pdf', type: 'pdf', folder: 'Qualiopi / Audit 2026', size: '—', version: '1.0', status: 'draft', owner: ME.id, updatedBy: ME.id, updatedAt: "à l'instant", tags: ['qualiopi', `indicateur-${ind.num}`], confidential: 'Interne', expires: null });
+    addDoc({ id, name: pieceName + '.pdf', type: 'pdf', folder: 'Qualiopi / Audit 2026', size: '—', version: '1.0', status: 'draft', owner: me?.id || null, updatedBy: me?.id || null, updatedAt: "à l'instant", tags: ['qualiopi', `indicateur-${ind.num}`], confidential: 'Interne', expires: null });
     showToast({ type: 'success', message: `"${pieceName}" créé — indicateur ${ind.num}` });
     setTimeout(() => router.push(`/documents/${id}/edit`), 400);
   };
@@ -134,12 +136,12 @@ export default function QualiopiScreen() {
 
           <div className="card-bd" style={{ paddingTop: 0 }}>
             <div className="row" style={{ gap: 8, padding: '10px 0', borderBottom: '1px solid var(--line)', marginBottom: 14 }}>
-              <Avatar user={USERS[ind.resp]} size="md" />
+              <Avatar user={USERS[ind.resp] || { name: ind.resp || '?' }} size="md" />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{USERS[ind.resp].name}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{USERS[ind.resp]?.name || ind.resp || '—'}</div>
                 <div className="micro">Référent · {ind.updated}</div>
               </div>
-              <button className="btn sm" onClick={() => showToast({ type: 'info', message: `Notification envoyée à ${USERS[ind.resp].name}` })}><Icon name="msg" size={12} /> Relancer</button>
+              <button className="btn sm" onClick={() => showToast({ type: 'info', message: `Notification envoyée à ${USERS[ind.resp]?.name || ind.resp || 'ce référent'}` })}><Icon name="msg" size={12} /> Relancer</button>
             </div>
 
             {/* Pieces */}

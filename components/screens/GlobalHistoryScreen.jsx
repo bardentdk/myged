@@ -26,7 +26,7 @@ const TYPE_ICONS = {
 function downloadVersionsReport(entries) {
   const lines = [
     'Version,Document,Auteur,Date,Note,Taille',
-    ...entries.map(e => `"${e.v}","${e.docName}","${USERS[e.author]?.name || e.author}","${e.date}","${e.note}","${e.size || '—'}"`)
+    ...entries.map(e => `"${e.v}","${e.docName}","${USERS[e.author]?.name || e.author || '—'}","${e.date}","${e.note || ''}","${e.size || '—'}"`)
   ].join('\n');
   const blob = new Blob([lines], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
@@ -37,7 +37,7 @@ function downloadVersionsReport(entries) {
 
 export default function GlobalHistoryScreen() {
   const router = useRouter();
-  const { docs, versions } = useDocs();
+  const { docs, versions, getProfile } = useDocs();
   const { showToast } = useToast();
   const [filterAuthor, setFilterAuthor] = useState('all');
   const [filterType, setFilterType] = useState('all');
@@ -59,9 +59,16 @@ export default function GlobalHistoryScreen() {
     });
   }, [versions, docs]);
 
+  const resolveAuthor = (id) => {
+    if (!id) return null;
+    const p = getProfile(id);
+    if (p) return { id, name: p.full_name || p.email || id };
+    return USERS[id] ? { id, name: USERS[id].name } : { id, name: id };
+  };
+
   const authors = useMemo(() => {
-    const ids = [...new Set(allEntries.map(e => e.author))];
-    return ids.filter(id => USERS[id]);
+    const ids = [...new Set(allEntries.map(e => e.author).filter(Boolean))];
+    return ids.filter(id => getProfile(id) || USERS[id]);
   }, [allEntries]);
 
   const filtered = allEntries.filter(e => {
@@ -142,7 +149,7 @@ export default function GlobalHistoryScreen() {
             <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}
               value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)}>
               <option value="all">Tous les auteurs</option>
-              {authors.map(id => <option key={id} value={id}>{USERS[id]?.name}</option>)}
+              {authors.map(id => <option key={id} value={id}>{resolveAuthor(id)?.name || id}</option>)}
             </select>
             <select className="input" style={{ width: 'auto', height: 34, fontSize: 13, padding: '0 10px' }}
               value={filterType} onChange={e => setFilterType(e.target.value)}>
@@ -165,7 +172,7 @@ export default function GlobalHistoryScreen() {
                   </div>
                   <div className="card" style={{ overflow: 'hidden' }}>
                     {entries.map((e, i) => {
-                      const u = USERS[e.author];
+                      const u = resolveAuthor(e.author);
                       return (
                         <motion.div key={`${e.docId}-${e.v}`}
                           initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}

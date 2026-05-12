@@ -7,7 +7,8 @@ import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon } from '@/components/ui/Atoms';
 import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { USERS, VERSIONS as FALLBACK_VERSIONS, ME } from '@/lib/data';
+import { USERS, VERSIONS as FALLBACK_VERSIONS } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 /* ─── Upload modal ─── */
 function UploadModal({ doc, onClose, onSubmit }) {
@@ -101,8 +102,9 @@ function DiffPane({ label, lines }) {
 /* ─── Main screen ─── */
 export default function VersionsScreen({ docId }) {
   const router = useRouter();
-  const { docs, versions, updateDoc, addVersion } = useDocs();
+  const { docs, versions, updateDoc, addVersion, getProfile } = useDocs();
   const { showToast } = useToast();
+  const { profile: me } = useUser();
 
   const doc = docs.find((d) => d.id === docId) || docs[0];
   const docVersions = versions[doc?.id] || FALLBACK_VERSIONS;
@@ -120,7 +122,7 @@ export default function VersionsScreen({ docId }) {
     const newVersion = `${parts[0]}.${parseInt(parts[1] || 0) + 1}`;
     addVersion(doc.id, {
       v: newVersion,
-      author: ME.id,
+      author: me?.id || null,
       date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       note,
       size: fileSize || '—',
@@ -132,7 +134,7 @@ export default function VersionsScreen({ docId }) {
   };
 
   const exportZip = () => {
-    const lines = docVersions.map((v) => `v${v.v} | ${v.date} | ${USERS[v.author]?.name || v.author} | ${v.note}`).join('\n');
+    const lines = docVersions.map((v) => { const p = getProfile(v.author); const name = p ? (p.full_name || p.email || v.author) : (USERS[v.author]?.name || v.author || '—'); return `v${v.v} | ${v.date} | ${name} | ${v.note || ''}`; }).join('\n');
     const blob = new Blob([lines], { type: 'text/plain' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `versions-${doc?.name || 'document'}.txt`; a.click();
@@ -168,7 +170,8 @@ export default function VersionsScreen({ docId }) {
         {/* Timeline */}
         <div className="card" style={{ padding: '6px 0', height: 'fit-content' }}>
           {docVersions.map((v, i) => {
-            const u = USERS[v.author];
+            const p = getProfile(v.author);
+            const u = p ? { name: p.full_name || p.email || '?', color: '#64748b' } : (USERS[v.author] || null);
             const sel = v.v === selected;
             return (
               <motion.div key={v.v} onClick={() => setSelected(v.v)} whileHover={{ x: 2 }} transition={{ duration: 0.1 }}
@@ -187,7 +190,7 @@ export default function VersionsScreen({ docId }) {
                   <div className="micro mono" style={{ marginTop: 4 }}>{v.date}</div>
                   <div className="row" style={{ gap: 5, marginTop: 6 }}>
                     {u && <Avatar user={u} size="xs" />}
-                    <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{u?.name.split(' ')[0] || v.author}</span>
+                    <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{u?.name?.split(' ')[0] || v.author}</span>
                     {v.size && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{v.size}</span>}
                   </div>
                 </div>

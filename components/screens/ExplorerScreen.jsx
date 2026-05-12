@@ -21,11 +21,11 @@ const TYPE_OPTIONS = [
 ];
 const CONF_OPTIONS = ['Public', 'Interne', 'Confidentiel'];
 
-function NewDocModal({ onClose }) {
+function NewDocModal({ onClose, folderOptions = FOLDER_OPTIONS }) {
   const { addDoc } = useDocs();
   const { showToast } = useToast();
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', type: 'doc', folder: FOLDER_OPTIONS[0], tags: '', confidential: 'Interne', expires: '', status: 'draft' });
+  const [form, setForm] = useState({ name: '', type: 'doc', folder: folderOptions[0] || FOLDER_OPTIONS[0], tags: '', confidential: 'Interne', expires: '', status: 'draft' });
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState(null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -87,7 +87,7 @@ function NewDocModal({ onClose }) {
             <div><label className="label">Type</label><select className="input" value={form.type} onChange={set('type')}>{TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
             <div><label className="label">Statut</label><select className="input" value={form.status} onChange={set('status')}><option value="draft">Brouillon</option><option value="review">En validation</option></select></div>
           </div>
-          <div><label className="label">Dossier</label><select className="input" value={form.folder} onChange={set('folder')}>{FOLDER_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
+          <div><label className="label">Dossier</label><select className="input" value={form.folder} onChange={set('folder')}>{folderOptions.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div><label className="label">Confidentialité</label><select className="input" value={form.confidential} onChange={set('confidential')}>{CONF_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
             <div><label className="label">Expiration</label><input className="input" type="date" value={form.expires} onChange={set('expires')} /></div>
@@ -171,6 +171,54 @@ function UploadQueue({ items, onDismiss }) {
   );
 }
 
+/* ─── New folder modal ─── */
+function NewFolderModal({ onClose, onSave, parentFolders }) {
+  const [name, setName] = useState('');
+  const [parent, setParent] = useState('');
+
+  const handleSave = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onSave({ name: parent ? `${parent} / ${trimmed}` : trimmed });
+    onClose();
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }} onClick={(e) => e.stopPropagation()}
+        style={{ background: 'var(--surface)', borderRadius: 14, width: '100%', maxWidth: 420, boxShadow: '0 24px 80px rgba(0,0,0,.2)', overflow: 'hidden' }}>
+        <div className="card-hd" style={{ padding: '18px 22px' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Nouveau dossier</h2>
+          <button className="btn ghost sm" onClick={onClose}><Icon name="x" size={16} /></button>
+        </div>
+        <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label className="label">Nom du dossier</label>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="ex. Sessions 2026" autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
+          </div>
+          <div>
+            <label className="label">Dossier parent (optionnel)</label>
+            <select className="input" value={parent} onChange={(e) => setParent(e.target.value)}>
+              <option value="">— Aucun (à la racine) —</option>
+              {parentFolders.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ padding: '12px 22px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn ghost" onClick={onClose}>Annuler</button>
+          <button className="btn primary" onClick={handleSave} disabled={!name.trim()}>
+            <Icon name="folder" size={13} /> Créer le dossier
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── Main drive screen ─── */
 export default function ExplorerScreen() {
   const router = useRouter();
@@ -187,11 +235,58 @@ export default function ExplorerScreen() {
   const [sortDir, setSortDir] = useState('desc');
   const [selected, setSelected] = useState(new Set());
   const [showNew, setShowNew] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [customFolders, setCustomFolders] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
   const [globalDrag, setGlobalDrag] = useState(false);
   const [uploads, setUploads] = useState([]);
   const [search, setSearch] = useState('');
+  const [zipLoading, setZipLoading] = useState(false);
   const dragCounter = useRef(0);
+
+  const allFolders = [
+    ...FOLDERS,
+    ...customFolders.map((f) => ({ id: f.id, name: f.name, kind: 'folder' })),
+  ];
+  const folderNames = allFolders.map((f) => f.name);
+
+  const handleCreateFolder = ({ name }) => {
+    const id = `cf-${Date.now()}`;
+    setCustomFolders((prev) => [...prev, { id, name }]);
+    showToast({ type: 'success', message: `Dossier « ${name} » créé` });
+  };
+
+  const handleExportFolderZip = async () => {
+    const folderDocs = filtered.filter((d) => d.storage_path);
+    if (!folderDocs.length) {
+      showToast({ type: 'warn', message: 'Aucun fichier stocké dans ce dossier à exporter' });
+      return;
+    }
+    setZipLoading(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const supabase = createClient();
+      await Promise.all(folderDocs.map(async (doc) => {
+        if (!supabase || !doc.storage_path) return;
+        const { data, error } = await supabase.storage.from('documents').download(doc.storage_path);
+        if (error || !data) return;
+        const arrayBuf = await data.arrayBuffer();
+        zip.file(doc.name, arrayBuf);
+      }));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${folder || 'documents'}.zip`;
+      a.click();
+      showToast({ type: 'success', message: `Archive ZIP créée (${folderDocs.length} fichier${folderDocs.length > 1 ? 's' : ''})` });
+    } catch (err) {
+      console.error('ZIP export error:', err);
+      showToast({ type: 'err', message: 'Erreur lors de la création du ZIP' });
+    } finally {
+      setZipLoading(false);
+    }
+  };
 
   /* filter & sort */
   const filtered = docs.filter((d) => {
@@ -326,7 +421,8 @@ export default function ExplorerScreen() {
 
   return (
     <div className="page" style={{ paddingTop: 22, position: 'relative' }}>
-      <AnimatePresence>{showNew && <NewDocModal onClose={() => setShowNew(false)} />}</AnimatePresence>
+      <AnimatePresence>{showNew && <NewDocModal onClose={() => setShowNew(false)} folderOptions={folderNames} />}</AnimatePresence>
+      <AnimatePresence>{showNewFolder && <NewFolderModal onClose={() => setShowNewFolder(false)} onSave={handleCreateFolder} parentFolders={folderNames} />}</AnimatePresence>
 
       {/* Context menu */}
       {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} doc={contextMenu.doc}
@@ -364,7 +460,7 @@ export default function ExplorerScreen() {
           <div className="row" style={{ gap: 6, fontSize: 12.5, color: 'var(--ink-3)' }}>
             <span>{docs.length} documents</span>
             <span>·</span>
-            <span>{FOLDERS.length} dossiers</span>
+            <span>{allFolders.length} dossier{allFolders.length > 1 ? 's' : ''}</span>
             {selected.size > 0 && <><span>·</span><span style={{ color: 'var(--accent)', fontWeight: 600 }}>{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</span></>}
           </div>
         </div>
@@ -376,6 +472,12 @@ export default function ExplorerScreen() {
               <button className="btn sm ghost" style={{ color: 'var(--err)' }} onClick={() => { selected.forEach((id) => deleteDoc(id)); setSelected(new Set()); showToast({ type: 'success', message: `${selected.size} supprimé(s)` }); }}><Icon name="trash" size={12} /> Supprimer</button>
             </div>
           )}
+          {folder && (
+            <button className="btn" onClick={handleExportFolderZip} disabled={zipLoading} title="Exporter le dossier en ZIP">
+              <Icon name="download" size={13} /> {zipLoading ? 'ZIP…' : 'Export ZIP'}
+            </button>
+          )}
+          <button className="btn" onClick={() => setShowNewFolder(true)}><Icon name="folder" size={13} /> Nouveau dossier</button>
           <button className="btn" onClick={() => document.getElementById('drive-upload').click()}><Icon name="upload" size={13} /> Téléverser</button>
           <input id="drive-upload" type="file" multiple style={{ display: 'none' }} onChange={(e) => Array.from(e.target.files).forEach(simulateUpload)} />
           <button className="btn primary" onClick={() => setShowNew(true)}><Icon name="plus" size={13} /> Nouveau document</button>
@@ -394,8 +496,13 @@ export default function ExplorerScreen() {
               <Icon name="home" size={14} style={{ color: !folder ? 'var(--accent)' : 'var(--ink-3)' }} /> Tous les documents
             </div>
             <div className="divider" style={{ margin: '6px 0' }} />
-            <div className="micro" style={{ padding: '2px 8px 6px', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', fontSize: 10 }}>Dossiers</div>
-            {FOLDERS.map((f) => (
+            <div style={{ display: 'flex', alignItems: 'center', padding: '2px 8px 6px' }}>
+              <span className="micro" style={{ fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', fontSize: 10, flex: 1 }}>Dossiers</span>
+              <button className="btn ghost sm" style={{ padding: '2px 4px', fontSize: 11 }} title="Nouveau dossier" onClick={() => setShowNewFolder(true)}>
+                <Icon name="plus" size={11} />
+              </button>
+            </div>
+            {allFolders.map((f) => (
               <div key={f.id} onClick={() => openFolder(f)}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
                   background: folder === f.name ? 'var(--surface-2)' : 'transparent',
@@ -403,7 +510,7 @@ export default function ExplorerScreen() {
                   fontWeight: folder === f.name ? 500 : 400 }}>
                 <Icon name="folder" size={14} style={{ color: folder === f.name ? 'var(--accent)' : 'var(--ink-3)' }} />
                 <span style={{ flex: 1 }}>{f.name}</span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{docs.filter((d) => d.folder.toLowerCase().includes(f.name.toLowerCase())).length || f.count}</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{docs.filter((d) => d.folder.toLowerCase().includes(f.name.toLowerCase())).length || ''}</span>
               </div>
             ))}
             <div className="divider" style={{ margin: '6px 0' }} />

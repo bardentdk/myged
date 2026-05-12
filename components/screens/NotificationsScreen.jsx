@@ -120,7 +120,7 @@ export default function NotificationsScreen() {
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.45, marginBottom: 4 }}>{n.body}</div>
                     <div className="row" style={{ gap: 8 }}>
-                      {n.who && <Avatar user={USERS[n.who]} size="xs" />}
+                      {n.who && <Avatar user={USERS[n.who] || { name: n.who }} size="xs" />}
                       <span className="micro mono">{n.when}</span>
                       {n.docId && <span className="micro" style={{ color: 'var(--accent)' }}>→ Voir le document</span>}
                     </div>

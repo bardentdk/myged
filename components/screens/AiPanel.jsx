@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Icon from '@/components/ui/Icon';
 import { Avatar, FileIcon } from '@/components/ui/Atoms';
-import { ME } from '@/lib/data';
 import { useDocs } from '@/lib/context/DocsContext';
+import { useUser } from '@/lib/context/UserContext';
 
 const SUGGESTIONS = [
   "Quels documents manquent pour la session TP SA 2026 ?",
@@ -21,13 +21,13 @@ function parseMarkdown(text) {
     .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:12px">$1</code>');
 }
 
-const Message = ({ m }) => {
+const Message = ({ m, me }) => {
   if (m.role === 'user') return (
     <div className="row" style={{ gap: 10, alignSelf: 'flex-end', maxWidth: '88%', marginLeft: 'auto' }}>
       <div style={{ padding: '8px 12px', background: 'var(--accent)', color: '#fff', borderRadius: 12, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.5 }}>
         {m.text}
       </div>
-      <Avatar user={ME} size="md" />
+      <Avatar user={me ? { name: me.full_name || me.email || '?' } : { name: '?' }} size="md" />
     </div>
   );
   return (
@@ -61,8 +61,10 @@ const Message = ({ m }) => {
 
 export default function AiPanel({ onClose }) {
   const { docs } = useDocs();
+  const { profile: me } = useUser();
+  const firstName = (me?.full_name || me?.email || 'vous').split(/[\s@]/)[0];
   const [messages, setMessages] = useState([
-    { role: 'ai', text: "Bonjour " + ME.name.split(' ')[0] + " — je peux retrouver des documents, résumer des contrats, préparer un audit Qualiopi ou comparer des versions. Que puis-je faire pour vous ?" },
+    { role: 'ai', text: `Bonjour ${firstName} — je peux retrouver des documents, résumer des contrats, préparer un audit Qualiopi ou comparer des versions. Que puis-je faire pour vous ?` },
   ]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -118,7 +120,7 @@ export default function AiPanel({ onClose }) {
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {messages.map((m, i) => <Message key={i} m={m} />)}
+          {messages.map((m, i) => <Message key={i} m={m} me={me} />)}
 
           {loading && (
             <div className="row" style={{ gap: 10 }}>

@@ -6,7 +6,8 @@ import Icon from '@/components/ui/Icon';
 import { Badge, FileIcon } from '@/components/ui/Atoms';
 import { useToast } from '@/lib/context/ToastContext';
 import { useDocs } from '@/lib/context/DocsContext';
-import { FOLDERS, ME } from '@/lib/data';
+import { FOLDERS } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 const TEMPLATES = [
   { id: 't1',  name: 'Convention de formation professionnelle',  category: 'Administratif',  type: 'doc', uses: 34, updated: '01 mars 2026',  version: '3.2', desc: 'Convention type conforme Code du travail art. L.6353-1, pré-remplie avec les champs du centre.' },
@@ -27,6 +28,7 @@ const CATEGORIES = ['Tous', 'Administratif', 'Pédagogie', 'RH & Contrats', 'Qua
 
 function CreateFromTemplateModal({ tpl, onClose }) {
   const { addDoc } = useDocs();
+  const { profile: me } = useUser();
   const router = useRouter();
   const currentYear = new Date().getFullYear();
   const [form, setForm] = useState({
@@ -45,8 +47,8 @@ function CreateFromTemplateModal({ tpl, onClose }) {
       size: '—',
       version: '1.0',
       status: 'draft',
-      owner: ME.id,
-      updatedBy: ME.id,
+      owner: me?.id || null,
+      updatedBy: me?.id || null,
       updatedAt: "à l'instant",
       tags: [],
       confidential: 'Interne',

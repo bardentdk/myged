@@ -17,7 +17,8 @@ import { useDocs } from '@/lib/context/DocsContext';
 import { useToast } from '@/lib/context/ToastContext';
 import Icon from '@/components/ui/Icon';
 import { StatusBadge, Avatar } from '@/components/ui/Atoms';
-import { USERS, ME } from '@/lib/data';
+import { USERS } from '@/lib/data';
+import { useUser } from '@/lib/context/UserContext';
 
 /* ─── Word-like editor ─── */
 function RichEditorToolbar({ editor }) {
@@ -419,6 +420,7 @@ export default function DocumentEditorScreen({ id }) {
   const router = useRouter();
   const { docs, contents, updateDoc, updateContent, addVersion } = useDocs();
   const { showToast } = useToast();
+  const { profile: me } = useUser();
   const doc = docs.find((d) => d.id === id) || docs[0];
   const content = contents[doc?.id] || '';
 
@@ -445,7 +447,7 @@ export default function DocumentEditorScreen({ id }) {
     const newVersion = `${parts[0]}.${parseInt(parts[1] || 0) + 1}`;
     addVersion(doc.id, {
       v: newVersion,
-      author: ME.id,
+      author: me?.id || null,
       date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       note: 'Sauvegarde depuis l\'éditeur',
       size: doc.size,
@@ -483,8 +485,8 @@ export default function DocumentEditorScreen({ id }) {
 
         {/* Owner */}
         <div className="row" style={{ gap: 6 }}>
-          <Avatar user={USERS[doc.owner]} size="xs" />
-          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{USERS[doc.owner]?.name.split(' ')[0]}</span>
+          <Avatar user={USERS[doc.owner] || { name: doc.owner || '?' }} size="xs" />
+          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{USERS[doc.owner]?.name?.split(' ')[0] || '—'}</span>
         </div>
 
         <button className="btn ghost sm" onClick={() => setShowMeta((v) => !v)} style={{ gap: 6 }}>

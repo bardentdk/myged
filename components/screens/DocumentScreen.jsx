@@ -1,25 +1,29 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '@/components/ui/Icon';
 import { Avatar, Badge, FileIcon, StatusBadge } from '@/components/ui/Atoms';
-import { USERS, ME, FOLDERS, STATUS_MAP } from '@/lib/data';
+import { USERS, FOLDERS } from '@/lib/data';
 import { useToast } from '@/lib/context/ToastContext';
 import { useDocs } from '@/lib/context/DocsContext';
+import { useUser } from '@/lib/context/UserContext';
+
+/* Module-level helper — receives profiles map so subcomponents can call it */
+function resolveUser(id, profiles = {}) {
+  if (!id) return null;
+  const p = profiles[id];
+  if (p) return { id: p.id, name: p.full_name || p.email || 'Utilisateur', role: p.role || '', color: '#64748b', avatar_url: p.avatar_url };
+  return USERS[id] || { id, name: id, role: '', color: '#64748b' };
+}
 
 export default function DocumentScreen({ id }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const { docs, comments, versions, updateDoc, addComment, deleteComment, addVersion, deleteDoc, getProfile } = useDocs();
-
-  const resolveUser = (id) => {
-    if (!id) return null;
-    const p = getProfile(id);
-    if (p) return { id: p.id, name: p.full_name || p.email || 'Utilisateur', role: p.role || '', color: '#64748b', avatar_url: p.avatar_url };
-    return USERS[id] || { id, name: id, role: '', color: '#64748b' };
-  };
+  const { docs, comments, versions, profiles, updateDoc, addComment, deleteComment, addVersion, deleteDoc } = useDocs();
+  const { profile: me } = useUser();
+  const ru = (uid) => resolveUser(uid, profiles);
 
   const doc = docs.find(d => d.id === id) || docs[0];
   const docVersions = versions[doc?.id] || [];
@@ -45,8 +49,8 @@ export default function DocumentScreen({ id }) {
   if (!doc) return <div className="page" style={{ paddingTop: 40, textAlign: 'center' }} ><p className="muted">Document introuvable.</p></div>;
 
   const isLocked = !!doc.lockedBy && scenario !== 'released';
-  const lockedByMe = doc.lockedBy === ME.id;
-  const lockOwner = isLocked ? resolveUser(doc.lockedBy) : null;
+  const lockedByMe = doc.lockedBy === me?.id;
+  const lockOwner = isLocked ? ru(doc.lockedBy) : null;
 
   const handleSaveEdit = (changes) => {
     updateDoc(doc.id, changes);
@@ -58,7 +62,7 @@ export default function DocumentScreen({ id }) {
     const parts = (doc.version || '1.0').split('.');
     const newVersion = `${parts[0]}.${parseInt(parts[1] || 0) + 1}`;
     addVersion(doc.id, {
-      v: newVersion, author: ME.id, date: "aujourd'hui · " + new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' }),
+      v: newVersion, author: me?.id || null, date: "aujourd'hui · " + new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' }),
       note, size: fileSize || '—', milestone: false,
     });
     updateDoc(doc.id, { version: newVersion });
@@ -112,7 +116,7 @@ export default function DocumentScreen({ id }) {
           </div>
           <div className="micro row" style={{ gap: 6 }}>
             <span>{doc.folder}</span><span>·</span><span>{doc.size}</span><span>·</span>
-            <span>Modifié {doc.updatedAt} par {resolveUser(doc.updatedBy)?.name?.split(' ')[0]}</span>
+            <span>Modifié {doc.updatedAt} par {ru(doc.updatedBy)?.name?.split(' ')[0]}</span>
             {doc.expires && (<><span>·</span><span>Expire le <span className="mono">{doc.expires}</span></span></>)}
           </div>
         </div>
@@ -224,15 +228,15 @@ export default function DocumentScreen({ id }) {
           </div>
           <div style={{ minHeight: 540 }}>
             {tab === 'preview'     && <PreviewPane doc={doc} isLocked={isLocked} lockOwner={lockOwner} />}
-            {tab === 'versions'    && <VersionsList docId={doc.id} docVersions={docVersions} onUpload={() => setShowUpload(true)} />}
-            {tab === 'activity'    && <ActivityList />}
-            {tab === 'comments'    && <CommentsPane docId={doc.id} comments={docComments} onAdd={addComment} onDelete={deleteComment} />}
-            {tab === 'permissions' && <PermissionsTable />}
+            {tab === 'versions'    && <VersionsList docId={doc.id} docVersions={docVersions} onUpload={() => setShowUpload(true)} profiles={profiles} />}
+            {tab === 'activity'    && <ActivityList docId={doc.id} />}
+            {tab === 'comments'    && <CommentsPane docId={doc.id} comments={docComments} onAdd={addComment} onDelete={deleteComment} profiles={profiles} meId={me?.id} />}
+            {tab === 'permissions' && <PermissionsTable profiles={profiles} />}
           </div>
         </div>
 
         <aside className="col" style={{ gap: 14 }}>
-          <DetailsCard doc={doc} isLocked={isLocked} lockOwner={lockOwner} onEdit={() => setShowEdit(true)} />
+          <DetailsCard doc={doc} isLocked={isLocked} lockOwner={lockOwner} onEdit={() => setShowEdit(true)} profiles={profiles} />
           <SignaturesCard signatures={signatures} onOpen={() => setShowSignature(true)} />
           <RelatedCard />
           <TagsCard doc={doc} onSave={(tags) => updateDoc(doc.id, { tags })} />
@@ -249,7 +253,7 @@ export default function DocumentScreen({ id }) {
         {showUpload && <UploadVersionModal onClose={() => setShowUpload(false)} onSave={handleUploadVersion} />}
         {showShare  && <ShareModal doc={doc} onClose={() => setShowShare(false)} />}
         {showDelete && <DeleteConfirmModal doc={doc} onCancel={() => setShowDelete(false)} onConfirm={handleDelete} />}
-        {showSignature && <SignatureModal doc={doc} signatures={signatures} onClose={() => setShowSignature(false)} onSign={handleSign} onRequest={handleSignRequest} onAdd={handleAddSigner} />}
+        {showSignature && <SignatureModal doc={doc} signatures={signatures} onClose={() => setShowSignature(false)} onSign={handleSign} onRequest={handleSignRequest} onAdd={handleAddSigner} meId={me?.id} profiles={profiles} />}
       </AnimatePresence>
     </div>
   );
@@ -578,7 +582,7 @@ const PreviewPane = ({ doc, isLocked, lockOwner }) => (
   </div>
 );
 
-const VersionsList = ({ docId, docVersions, onUpload }) => (
+const VersionsList = ({ docId, docVersions, onUpload, profiles }) => (
   <div style={{ padding: '8px 0' }}>
     <div style={{ padding: '10px 22px 14px', display: 'flex', justifyContent: 'flex-end' }}>
       <button className="btn sm primary" onClick={onUpload}><Icon name="upload" size={12} /> Téléverser une nouvelle version</button>
@@ -589,7 +593,7 @@ const VersionsList = ({ docId, docVersions, onUpload }) => (
       </div>
     )}
     {docVersions.map((v, i) => {
-      const u = resolveUser(v.author);
+      const u = resolveUser(v.author, profiles);
       return (
         <div key={v.v} style={{ display: 'flex', gap: 14, padding: '14px 22px', borderBottom: i < docVersions.length - 1 ? '1px solid var(--line)' : 0, background: v.current ? 'var(--accent-soft)' : 'transparent', position: 'relative' }}>
           {v.current && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: 'var(--accent)' }} />}
@@ -620,28 +624,32 @@ const VersionsList = ({ docId, docVersions, onUpload }) => (
   </div>
 );
 
-const ActivityList = () => {
-  const items = [
-    { who: 'sylvie', verb: 'a verrouillé',          when: "aujourd'hui · 14:32", type: 'lock' },
-    { who: 'anne',   verb: 'a téléchargé une copie', when: "aujourd'hui · 14:36", type: 'download' },
-    { who: 'jb',     verb: 'a validé v2.0',          when: '01 mars · 10:22',     type: 'check' },
-    { who: 'sylvie', verb: 'a remplacé par v2.3',    when: '15 mars · 14:32',     type: 'upload' },
-  ];
+const ActivityList = ({ docId }) => {
+  const [items, setItems] = useState([]);
+  const { profiles } = useDocs();
+  useEffect(() => {
+    const { createClient } = require('@/lib/supabase/client');
+    const supabase = createClient();
+    if (!supabase || !docId) return;
+    supabase.from('activity_log').select('*').eq('document_id', docId).order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => { if (data) setItems(data); });
+  }, [docId]);
   const colorMap = { lock: 'var(--warn)', download: 'var(--ink-3)', check: 'var(--ok)', upload: 'var(--ok)' };
+  const ACTION_VERB = { lock: 'a verrouillé', download: 'a téléchargé', comment: 'a commenté', eye: 'a consulté', check: 'a validé', share: 'a partagé', upload: 'a importé', history: 'a restauré', x: 'a supprimé', sig: 'a signé' };
+  if (items.length === 0) return <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Aucune activité enregistrée pour ce document.</div>;
   return (
     <div style={{ padding: '8px 22px' }}>
       {items.map((a, i) => {
-        const u = resolveUser(a.who);
+        const u = resolveUser(a.user_id, profiles);
         return (
-          <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < items.length - 1 ? '1px solid var(--line)' : 0 }}>
+          <div key={a.id || i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < items.length - 1 ? '1px solid var(--line)' : 0 }}>
             <Avatar user={u} size="md" />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Icon name={a.type} size={12} style={{ color: colorMap[a.type] }} />
-                <strong style={{ fontWeight: 500 }}>{u.name}</strong>
-                <span className="muted">{a.verb}</span>
+                <strong style={{ fontWeight: 500 }}>{u?.name || 'Utilisateur'}</strong>
+                <span className="muted">{ACTION_VERB[a.action] || a.action}</span>
               </div>
-              <div className="micro mono" style={{ marginTop: 2 }}>{a.when}</div>
+              <div className="micro mono" style={{ marginTop: 2 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {new Date(a.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
         );
@@ -650,13 +658,13 @@ const ActivityList = () => {
   );
 };
 
-const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
+const CommentsPane = ({ docId, comments, onAdd, onDelete, profiles, meId }) => {
   const [text, setText] = useState('');
 
   const handleSubmit = () => {
     if (!text.trim()) return;
     onAdd(docId, {
-      id: `c${Date.now()}`, who: 'anne', text: text.trim(),
+      id: `c${Date.now()}`, who: meId || null, text: text.trim(),
       when: "à l'instant", ts: Date.now(),
     });
     setText('');
@@ -665,7 +673,7 @@ const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
   return (
     <div style={{ padding: 22 }}>
       {comments.map((c, i) => {
-        const u = resolveUser(c.who);
+        const u = resolveUser(c.who, profiles);
         return (
           <div key={c.id} style={{ display: 'flex', gap: 12, padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
             <Avatar user={u} size="lg" />
@@ -675,7 +683,7 @@ const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
                   <strong style={{ fontSize: 13, fontWeight: 500 }}>{u?.name}</strong>
                   <span className="micro">{c.when}</span>
                 </div>
-                {c.who === 'anne' && (
+                {c.who === meId && (
                   <button className="btn ghost sm" style={{ padding: 4 }} onClick={() => onDelete(docId, c.id)}>
                     <Icon name="trash" size={12} style={{ color: 'var(--err)' }} />
                   </button>
@@ -690,7 +698,7 @@ const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
         <div style={{ padding: '20px 0', color: 'var(--ink-3)', fontSize: 13 }}>Aucun commentaire pour l'instant.</div>
       )}
       <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <Avatar user={ME} size="lg" />
+        <Avatar user={resolveUser(meId, profiles) || { name: '?', color: '#6366f1' }} size="lg" />
         <div style={{ flex: 1 }}>
           <textarea className="input" rows={3}
             placeholder="Ajouter un commentaire… utilisez @ pour mentionner"
@@ -708,7 +716,7 @@ const CommentsPane = ({ docId, comments, onAdd, onDelete }) => {
   );
 };
 
-const PermissionsTable = () => {
+const PermissionsTable = ({ profiles }) => {
   const rows = [
     { who: 'sylvie',  role: 'Propriétaire', perms: { r:1,d:1,w:1,v:1,s:1,x:1 } },
     { who: 'jb',      role: 'Direction',    perms: { r:1,d:1,w:1,v:1,s:1,x:0 } },
@@ -723,7 +731,7 @@ const PermissionsTable = () => {
         <thead><tr><th>Utilisateur</th><th>Rôle</th>{Object.entries(labels).map(([k,v]) => <th key={k} style={{ textAlign: 'center', padding: '8px 4px' }}>{v}</th>)}</tr></thead>
         <tbody>
           {rows.map(r => {
-            const u = resolveUser(r.who);
+            const u = resolveUser(r.who, profiles);
             return (
               <tr key={r.who} style={{ cursor: 'default' }}>
                 <td><div className="row" style={{ gap: 8 }}><Avatar user={u} size="md" /><span style={{ fontSize: 13, fontWeight: 500 }}>{u?.name}</span></div></td>
@@ -744,11 +752,11 @@ const PermissionsTable = () => {
 
 /* ─── Sidebar cards ───────────────────────────────────────────────────── */
 
-const DetailsCard = ({ doc, isLocked, lockOwner, onEdit }) => {
+const DetailsCard = ({ doc, isLocked, lockOwner, onEdit, profiles }) => {
   const rows = [
     { label: 'Statut',          v: <StatusBadge status={doc.status} /> },
     { label: 'Version',         v: <span className="mono">v{doc.version}</span> },
-    { label: 'Propriétaire',    v: <span className="row" style={{ gap: 6 }}><Avatar user={resolveUser(doc.owner)} size="xs" />{resolveUser(doc.owner)?.name}</span> },
+    { label: 'Propriétaire',    v: <span className="row" style={{ gap: 6 }}><Avatar user={resolveUser(doc.owner, profiles)} size="xs" />{resolveUser(doc.owner, profiles)?.name}</span> },
     { label: 'Taille',          v: <span className="mono">{doc.size}</span> },
     { label: 'Confidentialité', v: <Badge kind={doc.confidential === 'Confidentiel' ? 'violet' : 'neutral'} dot>{doc.confidential}</Badge> },
     { label: 'Expiration',      v: doc.expires ? <span className="mono">{doc.expires}</span> : <span className="muted">—</span> },
@@ -888,7 +896,7 @@ const SignaturesCard = ({ signatures, onOpen }) => {
 /* ─── Signature modal ───────────────────────────────────────────────────── */
 const SIGN_USERS = ['jb', 'sylvie', 'anne', 'melanie', 'thierry', 'marie'];
 
-const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd }) => {
+const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd, meId, profiles }) => {
   const [tab, setTab] = useState('status');
   const [drawMode, setDrawMode] = useState(false);
   const [signed, setSigned] = useState(false);
@@ -912,7 +920,7 @@ const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd }) 
     setSigned(false);
   };
 
-  const mySignature = signatures.find(s => s.user === ME.id);
+  const mySignature = signatures.find(s => s.user === meId);
   const addableUsers = SIGN_USERS.filter(uid => !signatures.find(s => s.user === uid));
 
   return (
@@ -969,7 +977,7 @@ const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd }) 
                           <button className="btn sm ghost" onClick={() => onRequest(s.user)}>
                             <Icon name="send" size={12} /> Relancer
                           </button>
-                          {s.user === ME.id && (
+                          {s.user === meId && (
                             <button className="btn sm primary" onClick={() => { onSign(s.id); setTab('sign'); }}>
                               <Icon name="edit" size={12} /> Signer
                             </button>
@@ -1037,7 +1045,7 @@ const SignatureModal = ({ doc, signatures, onClose, onSign, onRequest, onAdd }) 
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="btn" onClick={onClose}>Fermer</button>
           {tab === 'sign' && (
-            <button className="btn primary" onClick={() => { const ms = signatures.find(s => s.user === ME.id); if (ms) onSign(ms.id); onClose(); }}>
+            <button className="btn primary" onClick={() => { const ms = signatures.find(s => s.user === meId); if (ms) onSign(ms.id); onClose(); }}>
               <Icon name="edit" size={13} /> Confirmer la signature
             </button>
           )}
